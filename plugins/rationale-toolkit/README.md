@@ -15,11 +15,9 @@ A Claude Code plugin that enforces a rationale-first working style: explain
 Skills activate automatically when Claude Code judges the task matches their
 description — no manual invocation needed.
 
-### Hooks
-
-| Hook | Event | What it does |
-|---|---|---|
-| `block-node-modules-bin` | `PreToolUse` (Bash) | Blocks direct `node_modules/.bin/<tool>` invocations and steers Claude toward a system-installed binary or a package-manager runner (`pnpm exec`, `npx`, `bunx`) instead. |
+Dependency-management guardrail hooks (blocking direct `node_modules/.bin/`
+calls and direct manifest/lockfile edits) live in the separate
+[`pkg-manager-guardrails`](../pkg-manager-guardrails) plugin.
 
 ## Installation
 
