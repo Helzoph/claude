@@ -1,0 +1,5 @@
+# Personal machine config — kept locally only, never tracked in this
+# marketplace repo (no plugin mechanism auto-injects these; see README.md).
+/_claude.md
+/setting.json
+/CLAUDE.md
