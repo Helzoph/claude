@@ -17,6 +17,7 @@ or run `/plugin` to open the interactive marketplace UI.
 | Plugin | Description |
 |---|---|
 | [`rationale-toolkit`](plugins/rationale-toolkit) | Rationale-first coding style and outcome-verification discipline — explain the why before the what, and prove changes work before calling them done. |
+| [`apple-hig`](plugins/apple-hig) | Apple's UI/UX design philosophy (Human Interface Guidelines, iOS 26 "Liquid Glass" era) for front-end web development — hierarchy, harmony, concentric geometry, materials, semantic color, typography, and motion via CSS. |
 
 ## Repository layout
 
@@ -25,7 +26,8 @@ or run `/plugin` to open the interactive marketplace UI.
 ├── .claude-plugin/
 │   └── marketplace.json     # Marketplace manifest (this repo's plugin index)
 ├── plugins/
-│   └── rationale-toolkit/   # The plugin itself (skills + hooks)
+│   ├── rationale-toolkit/   # Rationale-first style + outcome verification (skills + hooks)
+│   └── apple-hig/           # Apple Human Interface Guidelines style skill
 ├── _claude.md                # Personal global CLAUDE.md reference (not a plugin component)
 ├── CLAUDE.md                  # Notes on maintaining _claude.md
 └── setting.json               # Personal machine settings.json reference (not a plugin component)
