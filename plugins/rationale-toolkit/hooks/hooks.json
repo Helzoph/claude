@@ -1,0 +1,17 @@
+{
+  "description": "Blocks direct node_modules/.bin invocations in Bash commands, steering toward system-installed binaries or package-manager runners (pnpm exec / npx / bunx).",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/block-node-modules-bin.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

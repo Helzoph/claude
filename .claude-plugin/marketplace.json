@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "helzoph-claude-marketplace",
+  "description": "Personal Claude Code plugin marketplace",
+  "owner": {
+    "name": "helzoph"
+  },
+  "plugins": [
+    {
+      "name": "rationale-toolkit",
+      "description": "Rationale-first coding style and outcome-verification discipline: explain the why before the what, and prove changes work before calling them done.",
+      "source": "./plugins/rationale-toolkit",
+      "category": "development"
+    }
+  ]
+}
