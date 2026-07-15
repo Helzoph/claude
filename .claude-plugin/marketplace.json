@@ -13,6 +13,12 @@
       "category": "development"
     },
     {
+      "name": "pkg-manager-guardrails",
+      "description": "Guardrail hooks that keep dependency management flowing through package-manager CLIs instead of direct filesystem edits or node_modules invocations.",
+      "source": "./plugins/pkg-manager-guardrails",
+      "category": "development"
+    },
+    {
       "name": "apple-hig",
       "description": "Apple's UI/UX design philosophy (Human Interface Guidelines, iOS 26 'Liquid Glass' era) for front-end web development: hierarchy, harmony, concentric geometry, materials, semantic color, typography, and motion via CSS.",
       "source": "./plugins/apple-hig",
