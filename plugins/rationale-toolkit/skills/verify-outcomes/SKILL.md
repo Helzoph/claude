@@ -118,6 +118,16 @@ Run language-specific toolchain checks. Refer to `toolchains/<language>.md` for 
   - **Caused by this change** → fix before proceeding, re-run.
   - **Pre-existing failure** → report to user with scope analysis. Do NOT fix without approval.
 
+### Coverage Gate
+
+Applies whenever the project has a coverage tool configured (see the coverage command in the relevant `toolchains/<language>.md`).
+
+- Run tests with coverage enabled (e.g. `--coverage`, `--cov`, `-coverprofile`).
+- **Line coverage must be >= 80% for changed files.** If it's below 80%:
+  - **Gap caused by this change** (new code you added lacks tests) → write tests to close the gap, re-run. Do NOT report completion until met.
+  - **Gap pre-existing** (untouched code in the same file was already under 80%) → report the pre-existing gap and its scope; do NOT block on it, and do NOT expand scope to fix it without approval.
+- If the project has no coverage tooling configured, state that explicitly instead of skipping silently — this is a "not verified" condition, not a pass.
+
 ### Step 4: Runtime Verification (when depth requires it)
 
 #### Dev Server Protocol
