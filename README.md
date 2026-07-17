@@ -28,13 +28,14 @@ or run `/plugin` to open the interactive marketplace UI.
 ├── plugins/
 │   ├── rationale-toolkit/   # Rationale-first style + outcome verification (skills + hooks)
 │   └── apple-hig/           # Apple Human Interface Guidelines style skill
-├── _claude.md                # Personal global CLAUDE.md reference (not a plugin component)
-├── CLAUDE.md                  # Notes on maintaining _claude.md
+├── reference/
+│   └── global-claude.md    # Personal global CLAUDE.md reference (not a plugin component)
+├── CLAUDE.md                  # Notes on maintaining reference/global-claude.md
 └── setting.json               # Personal machine settings.json reference (not a plugin component)
 ```
 
-`_claude.md` and `setting.json` are kept here only as personal reference /
-backup documents for this author's own `~/.claude/CLAUDE.md` and
+`reference/global-claude.md` and `setting.json` are kept here only as personal
+reference / backup documents for this author's own `~/.claude/CLAUDE.md` and
 `~/.claude/settings.json`. They are **not** part of the marketplace or the
 plugin — Claude Code plugins have no mechanism for auto-injecting global
 instructions or machine-level settings (env vars, permissions, statusline).
