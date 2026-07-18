@@ -1,0 +1,54 @@
+# dev-env-router: 共享路由器（machine 级，全机器只启动一次）
+#
+# 仅限本机开发使用（纯 HTTP，无 TLS）。禁止将本文件用作生产部署配置的参考。
+#
+# 本文件固定存放在本插件目录 plugins/dev-env-router/router/router-compose.yml，
+# 是全机器唯一一份、随插件安装一起分发的配置，不属于任何具体项目仓库，
+# 也绝不应被复制/生成到某个项目或 worktree 目录下——
+# 项目侧只使用 skills/onboard/templates/project-compose.yml，两者是完全独立的文件，
+# 不会在同一步操作里被一起处理。见 USAGE.md。
+#
+# 前置条件（在执行 `docker compose up -d` 之前，必须先手动完成，见 USAGE.md）：
+#   1. docker network create web
+#   2. 生成 ~/.dev-env-router/traefik/.htpasswd（basicauth 凭证文件）
+#
+# 实际运行时，把本文件复制一份到 ~/.dev-env-router/router-compose.yml 后再启动
+# （而不是直接对插件安装目录里的这份文件执行 -f），
+# 避免插件更新/marketplace 变动影响到正在运行的路由器配置。
+
+services:
+  traefik:
+    image: traefik:v3
+    container_name: dev-env-router-traefik
+    command:
+      - --providers.docker=true
+      # Rationale: 未显式打 traefik.enable=true label 的容器不应被自动暴露路由，
+      # 避免任何后台容器意外被本机域名访问到。
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --api.dashboard=true
+    ports:
+      - "80:80"
+      # Rationale: dashboard 只绑定 127.0.0.1，不监听 0.0.0.0，
+      # 防止同一局域网内其他设备无认证访问到全部项目的路由信息。
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # Rationale: 只读挂载，虽然仍等价于宿主机 Docker daemon 的完全控制权
+      # （Traefik 工作原理决定，无法进一步收窄），但至少防止 Traefik 自身写坏 socket 文件。
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ~/.dev-env-router/traefik/.htpasswd:/etc/traefik/.htpasswd:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dev-env-router-dashboard.rule=Host(`traefik.localhost`)
+      - traefik.http.routers.dev-env-router-dashboard.service=api@internal
+      # Rationale: dashboard 路由强制加 basicauth，即使端口已绑定 127.0.0.1，
+      # 也要求本机多用户场景下同样需要凭证才能查看/操作全局路由视图。
+      - traefik.http.routers.dev-env-router-dashboard.middlewares=dev-env-router-auth
+      - traefik.http.middlewares.dev-env-router-auth.basicauth.usersfile=/etc/traefik/.htpasswd
+    networks:
+      - web
+    restart: unless-stopped
+
+networks:
+  web:
+    external: true

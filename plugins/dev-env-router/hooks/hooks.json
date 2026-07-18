@@ -1,0 +1,17 @@
+{
+  "description": "Reminds Claude to use docker compose (not bare processes) when a session starts inside a project already onboarded to dev-env-router.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/detect-onboarded-project.ts\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

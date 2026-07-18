@@ -1,0 +1,36 @@
+# dev-env-router: 项目级 compose 模板（每个项目 / git worktree 各一份）
+#
+# 仅限本机开发使用（纯 HTTP，无 TLS）。禁止将本文件用作生产部署配置的参考。
+#
+# 使用前提：宿主机上已有共享路由器在运行（见插件目录下 router/router-compose.yml，
+# 由用户按 USAGE.md 一次性手动搭建），且已执行过 `docker network create web`。
+#
+# 身份来源：不显式设置 COMPOSE_PROJECT_NAME 时，Docker Compose 默认使用当前目录名
+# 作为项目名，据此派生出唯一域名 http://<目录名>.localhost —— 不需要手动分配端口/域名。
+#
+# 注意：Compose 会对目录名做归一化（转小写、替换非法字符），
+# 若目录名包含大写字母或点号等字符，实际生成的域名可能与目录名不完全一致，
+# 请以 `docker compose config` 或路由器 dashboard（见 skills/operate/SKILL.md）中显示的实际路由为准。
+
+services:
+  # TODO: 替换为项目实际的服务定义（可以是一个或多个服务）。
+  app:
+    # TODO: 按项目技术栈填写，例如：
+    #   build: .
+    # 或：
+    #   image: node:20
+    #   command: npm run dev
+    build: .
+    networks:
+      - web
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.localhost`)
+      # TODO: 把 80 改成容器内服务实际监听的端口（如 Vite 默认 5173、Express 常见 3000 等）
+      - traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80
+    # Rationale: 不发布 ports 到宿主机——所有访问都经由共享 Traefik 转发，
+    # 端口这个概念对使用者不再可见，也不会与其他项目/worktree 冲突。
+
+networks:
+  web:
+    external: true

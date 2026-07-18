@@ -1,0 +1,19 @@
+{
+  "name": "dev-env-router",
+  "version": "0.1.0",
+  "description": "Directory-derived identity for local dev environments via Docker Compose + a single shared Traefik router: no manual port bookkeeping across projects and worktrees.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "docker-compose",
+    "traefik",
+    "dev-environment",
+    "git-worktree",
+    "reverse-proxy",
+    "local-dev"
+  ]
+}

@@ -23,6 +23,12 @@
       "description": "Apple's UI/UX design philosophy (Human Interface Guidelines, iOS 26 'Liquid Glass' era) for front-end web development: hierarchy, harmony, concentric geometry, materials, semantic color, typography, and motion via CSS.",
       "source": "./plugins/apple-hig",
       "category": "design"
+    },
+    {
+      "name": "dev-env-router",
+      "description": "Directory-derived identity for local dev environments via Docker Compose + a single shared Traefik router: no manual port bookkeeping across projects and worktrees.",
+      "source": "./plugins/dev-env-router",
+      "category": "development"
     }
   ]
 }
