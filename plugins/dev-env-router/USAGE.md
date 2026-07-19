@@ -48,10 +48,10 @@ docker network create web
 
 ```bash
 mkdir -p ~/.dev-env-router/traefik
-htpasswd -Bbn <你选一个用户名> "$(openssl rand -base64 18)"
+htpasswd -Bc ~/.dev-env-router/traefik/.htpasswd <你选一个用户名>
 ```
 
-命令会打印一行 `用户名:哈希值`，把这一整行写进 `~/.dev-env-router/traefik/.htpasswd`。**这一步打印出来的密码只会显示这一次**，请当场记下来（比如存进密码管理器），之后不会再重复展示，文件里存的是哈希值，不是明文，找不回原始密码。
+`-c` 会直接创建（或覆盖）这个文件；不加 `-n` 时命令是交互式的，会提示你输入并确认一次密码（输入过程不回显，这是终端的正常行为，不是卡住了）。**这个密码由你自己设定和记忆**，请当场记好（比如存进密码管理器）——文件里存的是哈希值，不是明文，事后无法从文件里找回原始密码。
 
 ```bash
 chmod 600 ~/.dev-env-router/traefik/.htpasswd
@@ -74,6 +74,24 @@ docker compose -f ~/.dev-env-router/router-compose.yml up -d
 浏览器访问 `http://traefik.localhost`，输入第 2 步设置的用户名和密码，能看到 Traefik dashboard 即为成功。这个页面之后会持续有用——它会显示当前所有接入了路由的项目、各自的域名、后端健康状态，是查看"我现在到底跑了哪些东西"的地方，不需要再去 `docker ps` 里猜。
 
 以上 4 步**只需要做一次**，不会随每个新项目/新 worktree 重复。
+
+## 修改 basicauth 密码
+
+忘记密码，或者单纯想换一个，都执行同一条命令（用户名要和第 2 步设置的一致，否则会在文件里新增一行而不是替换）：
+
+```bash
+htpasswd -B ~/.dev-env-router/traefik/.htpasswd <第 2 步用的用户名>
+```
+
+不带 `-c` 是因为文件已经存在，不需要（也不应该）重新创建；命令会交互式提示你输入并确认新密码，回车后直接覆盖该用户名对应的哈希值。
+
+Traefik 对 `usersFile` 的热重载并不可靠——这里是单文件 bind mount（见 `router-compose.yml`），社区已知这种挂载方式经常检测不到文件变化。改完密码后，先刷新 `http://traefik.localhost` 试试新密码；如果还是提示旧密码或 401，执行：
+
+```bash
+docker compose -f ~/.dev-env-router/router-compose.yml restart traefik
+```
+
+重启容器后必定生效。
 
 ## 接入一个项目
 
