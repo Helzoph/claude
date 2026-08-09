@@ -17,7 +17,6 @@ or run `/plugin` to open the interactive marketplace UI.
 | Plugin | Description |
 |---|---|
 | [`rationale-toolkit`](plugins/rationale-toolkit) | Rationale-first coding style and outcome-verification discipline — explain the why before the what, and prove changes work before calling them done. |
-| [`apple-hig`](plugins/apple-hig) | Apple's UI/UX design philosophy (Human Interface Guidelines, iOS 26 "Liquid Glass" era) for front-end web development — hierarchy, harmony, concentric geometry, materials, semantic color, typography, and motion via CSS. |
 | [`dev-env-router`](plugins/dev-env-router) | Directory-derived identity for local dev environments via Docker Compose + a single shared Traefik router — no manual port bookkeeping across projects and worktrees. |
 
 ## Repository layout
@@ -28,7 +27,6 @@ or run `/plugin` to open the interactive marketplace UI.
 │   └── marketplace.json     # Marketplace manifest (this repo's plugin index)
 ├── plugins/
 │   ├── rationale-toolkit/   # Rationale-first style + outcome verification (skills + hooks)
-│   ├── apple-hig/           # Apple Human Interface Guidelines style skill
 │   └── dev-env-router/      # Directory-derived Docker Compose + Traefik dev routing (skills)
 ├── reference/
 │   └── global-claude.md    # Personal global CLAUDE.md reference (not a plugin component)

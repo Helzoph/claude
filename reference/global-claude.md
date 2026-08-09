@@ -46,15 +46,6 @@ IF none of the triggers match: skip this protocol, answer directly.
 5. StopCondition — state what "done" means and when to stop
 </output_protocol>
 
-<design_principles>
-Apply @right-sized-design skill to every new-code and architecture task (scope and rules defined in the skill itself, not restated here).
-</design_principles>
-
-<idea_review>
-IF the user proposes an approach/plan/design rather than issuing a concrete edit — "I want to build X", "I'm thinking of", "should I use X or Y", choosing a library or architecture, designing a schema/data-flow/filter, or any decision that is expensive to reverse — apply @pressure-test-ideas BEFORE implementing (protocol and stop condition defined in the skill itself, not restated here).
-Clear ≠ correct: a well-phrased bad idea must NOT pass just because it is unambiguous.
-</idea_review>
-
 <retry_limit>
 Retry the same or an equivalent command at most once. IF the result is empty or unchanged: change approach entirely, or ask the user — do not retry again.
 </retry_limit>
