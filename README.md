@@ -39,6 +39,11 @@ before it runs plugin-bundled hooks.
 |---|---|
 | [`rationale-toolkit`](plugins/rationale-toolkit) | Rationale-first coding style and outcome-verification discipline — explain the why before the what, and prove changes work before calling them done. |
 | [`dev-env-router`](plugins/dev-env-router) | Directory-derived identity for local dev environments via Docker Compose + a single shared Traefik router — no manual port bookkeeping across projects and worktrees. |
+| [`emil-design-skills`](plugins/emil-design-skills) | Interface design, animation, motion review, and frontend tooling skills by Emil Kowalski. |
+
+`emil-design-skills` is synchronized from its upstream GitHub repository by a
+scheduled workflow. Updates arrive as reviewable pull requests so the bundled
+skills stay current without silently changing the marketplace.
 
 ## Repository layout
 
@@ -46,10 +51,19 @@ before it runs plugin-bundled hooks.
 .
 ├── .claude-plugin/
 │   └── marketplace.json     # Marketplace manifest (this repo's plugin index)
+├── .github/
+│   ├── scripts/
+│   │   └── sync-emil-design-skills.py
+│   └── workflows/
+│       └── sync-emil-design-skills.yml
 ├── plugins/
 │   ├── rationale-toolkit/
 │   │   ├── .claude-plugin/plugin.json  # Claude Code manifest
 │   │   └── .codex-plugin/plugin.json   # Codex manifest
+│   ├── emil-design-skills/
+│   │   ├── .claude-plugin/plugin.json  # Claude Code manifest
+│   │   ├── .codex-plugin/plugin.json   # Codex manifest
+│   │   └── skills/                     # Imported upstream design skills
 │   └── dev-env-router/
 │       ├── .claude-plugin/plugin.json  # Claude Code manifest
 │       ├── .codex-plugin/plugin.json   # Codex manifest
