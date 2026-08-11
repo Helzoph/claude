@@ -1,0 +1,19 @@
+{
+  "name": "emil-design-skills",
+  "version": "0.1.0",
+  "description": "A collection of interface design, animation, motion review, and frontend tooling skills by Emil Kowalski.",
+  "author": {
+    "name": "Emil Kowalski"
+  },
+  "homepage": "https://emilkowal.ski/skill",
+  "repository": "https://github.com/emilkowalski/skills",
+  "license": "MIT",
+  "keywords": [
+    "design",
+    "animation",
+    "motion",
+    "frontend",
+    "ui",
+    "sonner"
+  ]
+}

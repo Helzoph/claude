@@ -17,6 +17,12 @@
       "description": "Directory-derived identity for local dev environments via Docker Compose + a single shared Traefik router: no manual port bookkeeping across projects and worktrees.",
       "source": "./plugins/dev-env-router",
       "category": "development"
+    },
+    {
+      "name": "emil-design-skills",
+      "description": "Polished interface design, animation, motion review, and frontend tooling skills by Emil Kowalski.",
+      "source": "./plugins/emil-design-skills",
+      "category": "development"
     }
   ]
 }
