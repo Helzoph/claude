@@ -1,0 +1,34 @@
+{
+  "name": "rationale-toolkit",
+  "version": "0.1.0",
+  "description": "Rationale-first coding style and outcome-verification discipline for Claude Code and Codex.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "rationale",
+    "code-review",
+    "testing",
+    "verification",
+    "quality",
+    "style"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Rationale Toolkit",
+    "shortDescription": "Rationale-first coding and outcome verification",
+    "longDescription": "Reusable skills for explaining design choices, reviewing code, and verifying outcomes before declaring work complete.",
+    "developerName": "helzoph",
+    "category": "Development",
+    "capabilities": [
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "Use Rationale Toolkit when writing or reviewing code.",
+      "Verify the outcome of this change before finishing."
+    ]
+  }
+}

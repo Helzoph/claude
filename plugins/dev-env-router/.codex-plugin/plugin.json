@@ -1,0 +1,35 @@
+{
+  "name": "dev-env-router",
+  "version": "0.1.0",
+  "description": "Directory-derived local dev routing with Docker Compose and a shared Traefik router for Claude Code and Codex.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "docker-compose",
+    "traefik",
+    "dev-environment",
+    "git-worktree",
+    "reverse-proxy",
+    "local-dev"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Dev Environment Router",
+    "shortDescription": "Directory-derived Docker and Traefik dev routing",
+    "longDescription": "Reusable skills and a session-start hook for onboarding, operating, and cleaning up Docker Compose projects behind a shared Traefik router.",
+    "developerName": "helzoph",
+    "category": "Development",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Onboard this project to the shared dev router.",
+      "Operate the already-onboarded project through Docker Compose."
+    ]
+  }
+}
