@@ -103,7 +103,8 @@ def normalize_codex_compatibility(root: Path) -> None:
                 # Rationale: Codex rejects true for this field; normalize only the
                 # known upstream metadata line and leave the skill body untouched.
                 lines[index] = line.replace("true", "false")
-                break
+                # Rationale: keep scanning until the closing delimiter; replacing a
+                # metadata line does not mean the frontmatter has ended.
         if not frontmatter_closed:
             fail(f"Unterminated YAML frontmatter: {skill_file}")
         skill_file.write_text("".join(lines), encoding="utf-8")

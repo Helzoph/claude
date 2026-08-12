@@ -18,12 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out this marketplace
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Check out upstream skills
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: emilkowalski/skills
           ref: main
