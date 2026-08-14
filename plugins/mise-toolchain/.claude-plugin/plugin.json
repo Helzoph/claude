@@ -1,0 +1,19 @@
+{
+  "name": "mise-toolchain",
+  "version": "0.1.0",
+  "description": "Project toolchain versions and cross-worktree env layering via mise: inherit the machine's own version preferences into mise.toml, and share one baseline .env across worktrees without copying secrets around.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "mise",
+    "toolchain",
+    "version-manager",
+    "dotenv",
+    "git-worktree",
+    "dev-environment"
+  ]
+}

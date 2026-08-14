@@ -1,0 +1,35 @@
+{
+  "name": "dev-credentials",
+  "version": "0.1.0",
+  "description": "Machine-level, agent-readable dev credentials for testing, for Claude Code and Codex.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "credentials",
+    "secrets",
+    "llm",
+    "testing",
+    "dev-environment",
+    "api-key"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Dev Credentials",
+    "shortDescription": "Agent-readable, budget-capped test credentials",
+    "longDescription": "Provides a skill for creating and consuming a single machine-level credentials file that an agent may read when it needs a working API key to run or test something, without touching the project's real secrets.",
+    "developerName": "helzoph",
+    "category": "Development",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Set up the dev credentials file so I can paste a test key into it.",
+      "Use the dev credentials to run this against a real model."
+    ]
+  }
+}

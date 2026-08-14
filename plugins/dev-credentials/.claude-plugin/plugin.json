@@ -1,0 +1,19 @@
+{
+  "name": "dev-credentials",
+  "version": "0.1.0",
+  "description": "A single machine-level file holding budget-capped dev credentials that an agent is explicitly allowed to read and use for testing, so real project secrets never have to be exposed to get a test run working.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "credentials",
+    "secrets",
+    "llm",
+    "testing",
+    "dev-environment",
+    "api-key"
+  ]
+}

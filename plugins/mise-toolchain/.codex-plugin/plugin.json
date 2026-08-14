@@ -1,0 +1,35 @@
+{
+  "name": "mise-toolchain",
+  "version": "0.1.0",
+  "description": "Project toolchain versions and cross-worktree env layering via mise, for Claude Code and Codex.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "mise",
+    "toolchain",
+    "version-manager",
+    "dotenv",
+    "git-worktree",
+    "dev-environment"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "mise Toolchain",
+    "shortDescription": "mise-based toolchain pinning and env layering",
+    "longDescription": "Skills for writing a project's mise.toml [tools] block by inheriting the machine's existing version preferences, and for layering a shared baseline .env across git worktrees through mise.local.toml.",
+    "developerName": "helzoph",
+    "category": "Development",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Pin this project's toolchain versions with mise.",
+      "Let this worktree reuse the shared baseline .env."
+    ]
+  }
+}

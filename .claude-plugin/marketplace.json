@@ -19,6 +19,18 @@
       "category": "development"
     },
     {
+      "name": "mise-toolchain",
+      "description": "Project toolchain versions and cross-worktree env layering via mise: inherit the machine's own version preferences into mise.toml, and share one baseline .env across worktrees without copying secrets around.",
+      "source": "./plugins/mise-toolchain",
+      "category": "development"
+    },
+    {
+      "name": "dev-credentials",
+      "description": "A single machine-level file holding budget-capped dev credentials that an agent is explicitly allowed to read and use for testing, so real project secrets never have to be exposed to get a test run working.",
+      "source": "./plugins/dev-credentials",
+      "category": "development"
+    },
+    {
       "name": "emil-design-skills",
       "description": "Polished interface design, animation, motion review, and frontend tooling skills by Emil Kowalski.",
       "source": "./plugins/emil-design-skills",
