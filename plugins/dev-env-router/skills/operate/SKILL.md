@@ -43,7 +43,7 @@ Rationale：`COMPOSE_PROJECT_NAME`（进而域名）依赖当前工作目录派�
 http://traefik.localhost
 ```
 
-需要 `~/.dev-env-router/traefik/.htpasswd` 对应的 basicauth 凭证登录。这里能看到当前所有正在运行的项目、各自的域名路由、后端健康状态。
+需要 `~/.local/share/dev-env/traefik/.htpasswd` 对应的 basicauth 凭证登录。这里能看到当前所有正在运行的项目、各自的域名路由、后端健康状态。
 
 ## 边界
 

@@ -10,9 +10,9 @@
 #
 # 前置条件（在执行 `docker compose up -d` 之前，必须先手动完成，见 USAGE.md）：
 #   1. docker network create web
-#   2. 生成 ~/.dev-env-router/traefik/.htpasswd（basicauth 凭证文件）
+#   2. 生成 ~/.local/share/dev-env/traefik/.htpasswd（basicauth 凭证文件）
 #
-# 实际运行时，把本文件复制一份到 ~/.dev-env-router/router-compose.yml 后再启动
+# 实际运行时，把本文件复制一份到 ~/.local/share/dev-env/router-compose.yml 后再启动
 # （而不是直接对插件安装目录里的这份文件执行 -f），
 # 避免插件更新/marketplace 变动影响到正在运行的路由器配置。
 
@@ -36,7 +36,7 @@ services:
       # Rationale: 只读挂载，虽然仍等价于宿主机 Docker daemon 的完全控制权
       # （Traefik 工作原理决定，无法进一步收窄），但至少防止 Traefik 自身写坏 socket 文件。
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ~/.dev-env-router/traefik/.htpasswd:/etc/traefik/.htpasswd:ro
+      - ~/.local/share/dev-env/traefik/.htpasswd:/etc/traefik/.htpasswd:ro
     labels:
       - traefik.enable=true
       - traefik.http.routers.dev-env-router-dashboard.rule=Host(`traefik.localhost`)

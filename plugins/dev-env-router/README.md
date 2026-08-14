@@ -44,7 +44,7 @@ which strips erasable TypeScript syntax by default — no build step or
 
 | Template | Scope | Purpose |
 |---|---|---|
-| [`router/router-compose.yml`](router/router-compose.yml) | Machine-level, one instance total. Lives in the plugin directory itself — never copied into a project or worktree; the user manually copies it to `~/.dev-env-router/` and starts it once, per USAGE.md. | The shared Traefik router: dashboard bound to `127.0.0.1` + basicauth, `providers.docker.exposedbydefault=false`. |
+| [`router/router-compose.yml`](router/router-compose.yml) | Machine-level, one instance total. Lives in the plugin directory itself — never copied into a project or worktree; the user manually copies it to `~/.local/share/dev-env/` and starts it once, per USAGE.md. | The shared Traefik router: dashboard bound to `127.0.0.1` + basicauth, `providers.docker.exposedbydefault=false`. |
 | [`skills/onboard/templates/project-compose.yml`](skills/onboard/templates/project-compose.yml) | Per project/worktree | No host port publishing; joins the external `web` network; Traefik labels derived from `${COMPOSE_PROJECT_NAME}`. |
 
 ## Installation
