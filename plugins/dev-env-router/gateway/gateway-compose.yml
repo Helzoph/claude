@@ -1,0 +1,44 @@
+# dev-env-router: 可选的 LLM 网关（machine 级，全机器只启动一次）
+#
+# 仅限本机开发使用（纯 HTTP，无 TLS）。禁止将本文件用作生产部署配置的参考。
+#
+# 它解决什么：让项目的 .env 里不再出现真实 LLM API key。项目改为指向本网关，
+# 真 key 只存在于网关的数据目录（工作区之外），agent 读到项目配置也拿不到凭证。
+#
+# 它没有解决什么：网关默认无鉴权，agent 照样能调用它。风险是从「凭证外泄、
+# 损失无上界」降级为「本机额度被消耗、有日志可查」，不是消失。
+#
+# 前置条件：
+#   1. 共享 Traefik 路由器已在运行（见 router/router-compose.yml 与 USAGE.md）
+#   2. docker network create web
+#   3. mkdir -p ~/.local/share/dev-env/bifrost && chmod 700 ~/.local/share/dev-env/bifrost
+#
+# 与 router-compose.yml 相同的约定：复制一份到任意 git 工作区之外的位置再启动，
+# 而不是直接对插件安装目录里的这份文件执行 -f，以免插件更新影响正在运行的服务。
+#
+# 启动后打开 http://llm.localhost，在 Web UI 里填入各家上游的真实 key。
+
+services:
+  bifrost:
+    # Rationale: 钉死版本号，绝不用 :latest。本容器集中托管全部 LLM 密钥，
+    # 用会自动拉取新镜像的标签去托管密钥，风险模型自相矛盾——
+    # 2026 年 3 月 LiteLLM 的 PyPI 供应链攻击注入的正是窃取凭证的代码。
+    # 升级前先看上游 release notes，手动改这里的 tag。
+    image: maximhq/bifrost:v1.6.10
+    container_name: dev-llm-gateway
+    volumes:
+      # Rationale: 真实上游 key 存在这个目录里，位于任何 git 工作区之外。
+      # 与 ~/.local/share/dev-env/traefik/.htpasswd 是同一个模式：
+      # 配置进仓库，凭证留在仓库外，靠目录权限而非 .gitignore 兜底。
+      - ~/.local/share/dev-env/bifrost:/app/data
+    networks:
+      - web
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dev-llm-gateway.rule=Host(`llm.localhost`)
+      - traefik.http.services.dev-llm-gateway.loadbalancer.server.port=8080
+    restart: unless-stopped
+
+networks:
+  web:
+    external: true

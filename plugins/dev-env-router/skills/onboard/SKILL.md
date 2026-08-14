@@ -41,6 +41,35 @@ description: "Onboards a project/worktree that has no Traefik labels yet onto ht
 
 4. 验证：访问 `http://<项目目录名>.localhost`。如果目录名包含大写字母、点号等字符，Compose 会做归一化，实际域名可能与目录名不完全一致——以 dashboard（`http://traefik.localhost`）里显示的实际路由为准。
 
+## 环境变量：容器侧接到共享 baseline
+
+如果项目需要 `.env` 才能启动，**不要把 `.env` 复制进 worktree**。`.env` 是未跟踪文件，`git worktree add` 不会带过来，手动复制会导致每个 worktree 各有一份副本、各自漂移。
+
+正确做法是让容器读工作区外的共享 baseline，写在 `docker-compose.override.yml` 里（该文件必须 gitignore）：
+
+```yaml
+services:
+  <打了 traefik label 的那个服务>:
+    env_file:
+      - ${HOME}/.local/share/dev-env/env/<选中的那一个>.env   # baseline
+      - path: .env.local                   # 本 worktree 私有覆盖
+        required: false                    # 大多数 worktree 没有这个文件
+```
+
+baseline 选哪一个，用和宿主机侧**完全相同**的规则：`~/.local/share/dev-env/env/<repo>.env` 存在就用它，否则回退 `~/.local/share/dev-env/env/dev.env`，两个都没有就停下来问用户。完整规则见 `mise-toolchain` 插件的 `link-env` skill——两侧必须选中同一个文件，否则就会出现"容器里跑得通、宿主机跑不通"。
+
+几个必须注意的点：
+
+- **`env_file` 不展开 `~`**，必须写 `${HOME}` 或绝对路径。写成 `~/...` 时 Compose 会当作字面量目录名去找，报文件不存在。这一点和 mise 的 `_.file` 相反（那边 `~` 会展开），两处配置容易互相照抄写错。
+- `required: false` 需要 Compose 2.24+。低版本会因为无法识别长语法而报错。
+- `<repo>` 用**仓库名**而非 worktree 目录名。在 worktree 里 `git rev-parse --show-toplevel` 返回的是 worktree 目录名（会选错），要用 `basename "$(git rev-parse --path-format=absolute --git-common-dir | xargs dirname)"`。
+- **不要在 `~/.local/share/dev-env/env/` 下创建任何文件**，那个目录只由用户手动维护。
+- 写在 `docker-compose.override.yml` 而不是 `docker-compose.yml`：后者要进 git，写入机器级绝对路径会让配置不可移植，且每个 worktree 改同一行必然产生 merge 冲突。
+
+**不要读取、打印或复制 baseline 与 `.env.local` 的内容**，这里只需要把路径接上。baseline 本身的创建（`mkdir` / `mv` / `chmod 600`）应当由用户自己执行，把命令告诉他即可。
+
+宿主机侧如果也要跑同一个项目（`npm run dev` 这类），必须读**同一份 baseline**，否则会出现"容器里跑得通、宿主机跑不通"这类难排查的问题。宿主机侧的接法归 `mise-toolchain` 插件的 `link-env` skill 管（写在 `mise.local.toml` 里）；两边通过约定同一个 baseline 路径协作，不共享配置文件。
+
 ## 后续
 
 - 日常启停规则见 `operate` skill。

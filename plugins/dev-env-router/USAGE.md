@@ -14,7 +14,7 @@
 |---|---|---|
 | 配置文件 | `router/router-compose.yml` | `skills/onboard/templates/project-compose.yml` |
 | 实例数量 | 全机器唯一一份，常驻 | 每个项目/worktree 各一份 |
-| 存放位置 | `~/.dev-env-router/`（不进任何 git 仓库） | 目标项目自己的仓库里 |
+| 存放位置 | `~/.local/share/dev-env/`（不进任何 git 仓库） | 目标项目自己的仓库里 |
 | 谁来发起 | 需要你明确同意才会首次启动 | 你要求接入某个项目时才生成 |
 
 这两个文件**从设计上就是分开的**，不会被同一步操作一起处理。如果发现某次操作试图把 `router-compose.yml` 复制进某个项目仓库，那是不对的，应该停下来。
@@ -44,17 +44,17 @@ docker network create web
 
 ### 第 2 步：生成 basicauth 凭证文件
 
-**这里有个容易踩的坑**：`router-compose.yml` 里把 `~/.dev-env-router/traefik/.htpasswd` 作为文件挂进容器（bind mount）。如果这个文件在启动前不存在，Docker 常见的行为是**把它当成目录自动创建一个空目录**，而不是报错提示"文件不存在"——Traefik 容器会因为挂载路径类型不对而启动失败，报错信息还不直观。所以必须先手动创建好这个文件：
+**这里有个容易踩的坑**：`router-compose.yml` 里把 `~/.local/share/dev-env/traefik/.htpasswd` 作为文件挂进容器（bind mount）。如果这个文件在启动前不存在，Docker 常见的行为是**把它当成目录自动创建一个空目录**，而不是报错提示"文件不存在"——Traefik 容器会因为挂载路径类型不对而启动失败，报错信息还不直观。所以必须先手动创建好这个文件：
 
 ```bash
-mkdir -p ~/.dev-env-router/traefik
-htpasswd -Bc ~/.dev-env-router/traefik/.htpasswd <你选一个用户名>
+mkdir -p ~/.local/share/dev-env/traefik
+htpasswd -Bc ~/.local/share/dev-env/traefik/.htpasswd <你选一个用户名>
 ```
 
 `-c` 会直接创建（或覆盖）这个文件；不加 `-n` 时命令是交互式的，会提示你输入并确认一次密码（输入过程不回显，这是终端的正常行为，不是卡住了）。**这个密码由你自己设定和记忆**，请当场记好（比如存进密码管理器）——文件里存的是哈希值，不是明文，事后无法从文件里找回原始密码。
 
 ```bash
-chmod 600 ~/.dev-env-router/traefik/.htpasswd
+chmod 600 ~/.local/share/dev-env/traefik/.htpasswd
 ```
 
 限制这个文件只有你自己能读。
@@ -62,12 +62,14 @@ chmod 600 ~/.dev-env-router/traefik/.htpasswd
 ### 第 3 步：复制配置并启动
 
 ```bash
-mkdir -p ~/.dev-env-router
-cp <插件安装路径>/plugins/dev-env-router/router/router-compose.yml ~/.dev-env-router/router-compose.yml
-docker compose -f ~/.dev-env-router/router-compose.yml up -d
+mkdir -p ~/.local/share/dev-env
+cp <插件安装路径>/plugins/dev-env-router/router/router-compose.yml ~/.local/share/dev-env/router-compose.yml
+docker compose -f ~/.local/share/dev-env/router-compose.yml up -d
 ```
 
-复制一份到 `~/.dev-env-router/` 再启动，而不是直接对插件目录里的文件执行 `-f`——这样以后插件更新、或者这个 marketplace 仓库有变动，都不会影响到正在运行的路由器。
+复制一份出来再启动，而不是直接对插件目录里的文件执行 `-f`——这样以后插件更新、或者这个 marketplace 仓库有变动，都不会影响到正在运行的路由器。
+
+放哪里其实随意，只要在任何 git 工作区之外即可；本文档后面所有 `docker compose -f ...` 命令都以 `~/.local/share/dev-env/router-compose.yml` 为例，**如果你把它放在了别处，那些命令里的路径要换成你自己的**。忘了放哪时用 `docker inspect dev-env-router-traefik --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}'` 查。
 
 ### 第 4 步：验证
 
@@ -75,12 +77,64 @@ docker compose -f ~/.dev-env-router/router-compose.yml up -d
 
 以上 4 步**只需要做一次**，不会随每个新项目/新 worktree 重复。
 
+## 可选：搭一个 LLM 网关，让项目里不再出现真 API key
+
+这一节和路由本身无关，是**另一个机器级一次性搭建**，性质和上面的 Traefik 相同：涉及真实凭证，由你自己手动完成，不交给 agent 触发。不需要 LLM key 的话可以整节跳过。
+
+### 它解决什么
+
+`.env` 里放真实的 LLM API key，意味着任何能读到工作区的东西（包括 agent）都可能把它读进上下文里。而 agent 和你的 shell 是同一个用户、同一台机器，`chmod`、加密 key file 这类手段都拦不住——它能走和你完全相同的路径拿到凭证。
+
+网关换了个思路：**不去保护 key，而是让项目里根本没有真 key**。
+
+```
+项目 .env（可以被随便看）              网关容器（工作区外，唯一持有真 key）
+OPENAI_BASE_URL=http://llm.localhost/openai  ──►  Bifrost
+OPENAI_API_KEY=sk-local-placeholder               真的 sk-ant-… / sk-…
+```
+
+OpenAI / Anthropic / Google 的官方 SDK 都支持改 base URL，所以项目代码一行都不用动。
+
+要说清楚它**没有**解决什么：网关默认无鉴权，agent 照样能调用它。风险是从「凭证外泄、损失无上界」降级成「本机额度被消耗、有日志可查」，不是消失。
+
+### 搭建步骤
+
+```bash
+# 1. 准备凭证目录（在任何 git 工作区之外）
+mkdir -p ~/.local/share/dev-env/bifrost
+chmod 700 ~/.local/share/dev-env/bifrost
+
+# 2. 复制 compose 文件到工作区之外，再启动
+cp <插件安装路径>/plugins/dev-env-router/gateway/gateway-compose.yml ~/.local/share/dev-env/gateway-compose.yml
+docker compose -f ~/.local/share/dev-env/gateway-compose.yml up -d
+
+# 3. 打开 http://llm.localhost，在 Web UI 里填入各家上游的真实 API key
+```
+
+第 3 步在浏览器里做，**不要把 key 写进 compose 文件或任何 `.env`**——Bifrost 把 provider 配置存在挂载的 `/app/data` 里，也就是 `~/.local/share/dev-env/bifrost/`，那里在工作区之外。
+
+### 项目侧怎么用
+
+```bash
+# .env 里改成这样，这两行现在可以安全地被看到
+OPENAI_BASE_URL=http://llm.localhost/openai
+OPENAI_API_KEY=sk-local-placeholder
+```
+
+Anthropic SDK 用 `http://llm.localhost/anthropic`，Google GenAI 用 `http://llm.localhost/genai`。
+
+### 为什么钉死镜像版本
+
+compose 文件里的 tag 是写死的具体版本，**不要改成 `:latest`**。这个容器集中托管了你全部的 LLM 密钥，用一个会自动拉新镜像的标签去托管密钥，风险模型是自相矛盾的——2026 年 3 月 LiteLLM 的 PyPI 供应链攻击注入的正是窃取 SSH key 和云凭证的代码。升级时先看上游 release notes，再手动改 tag。
+
+同理，这也是**把所有 key 集中到一处的固有代价**：网关被攻破就是全部丢失。这个取舍在本机开发场景下可以接受，换到别的场景要重新评估。
+
 ## 修改 basicauth 密码
 
 忘记密码，或者单纯想换一个，都执行同一条命令（用户名要和第 2 步设置的一致，否则会在文件里新增一行而不是替换）：
 
 ```bash
-htpasswd -B ~/.dev-env-router/traefik/.htpasswd <第 2 步用的用户名>
+htpasswd -B ~/.local/share/dev-env/traefik/.htpasswd <第 2 步用的用户名>
 ```
 
 不带 `-c` 是因为文件已经存在，不需要（也不应该）重新创建；命令会交互式提示你输入并确认新密码，回车后直接覆盖该用户名对应的哈希值。
@@ -88,7 +142,7 @@ htpasswd -B ~/.dev-env-router/traefik/.htpasswd <第 2 步用的用户名>
 Traefik 对 `usersFile` 的热重载并不可靠——这里是单文件 bind mount（见 `router-compose.yml`），社区已知这种挂载方式经常检测不到文件变化。改完密码后，先刷新 `http://traefik.localhost` 试试新密码；如果还是提示旧密码或 401，执行：
 
 ```bash
-docker compose -f ~/.dev-env-router/router-compose.yml restart traefik
+docker compose -f ~/.local/share/dev-env/router-compose.yml restart traefik
 ```
 
 重启容器后必定生效。
