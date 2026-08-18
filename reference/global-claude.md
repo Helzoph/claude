@@ -25,16 +25,8 @@
 </dev-credentials>
 
 <emil-design-skills>
-- Use `emil-design-eng` for UI polish, component design, and animation decisions.
-- Use `animate` when building a new animation, transition, or motion interaction.
-- Use `review-animations` when reviewing existing animation or motion code.
-- Use `improve-animations` when auditing animation across a codebase and producing an improvement roadmap; it is read-only.
-- Use `find-animation-opportunities` when looking for places where motion could improve a UI; it proposes changes and does not implement them.
-- Use `animation-vocabulary` when naming or identifying a motion effect from a vague description.
-- Use `apple-design` for gesture-driven UI, spring and drag interactions, sheets, momentum, materials, typography, or Apple-style interaction principles.
-- Use `pick-ui-library` only when explicitly asked to choose a frontend library for a task.
-- Use `prototype` only when explicitly asked to build multiple UI variants behind a visual picker.
-- Use `ask-sonner` when working with or troubleshooting the Sonner React toast library.
+- For any frontend UI, component, animation, or interaction work, pick the matching skill from `emil-design-skills` first — read its own description to choose. Do not hand-roll styling or motion when a skill covers it.
+- Exception: `pick-ui-library` and `prototype` are opt-in — use them only when the user explicitly asks to choose a library or to build multiple variants.
 </emil-design-skills>
 
 ## Tool preferences
@@ -49,6 +41,10 @@
 <yagni>
 Follow YAGNI: implement only the current requirement. Avoid speculative abstractions, configuration, extension points, and automation; prefer the smallest maintainable solution.
 </yagni>
+
+<reuse-first>
+Before adding a helper, config, dependency, script, or pattern, search the project for one that already does the job, and use it. Extend the existing thing rather than introducing a parallel one; when several existing approaches conflict, follow the one most used in the code you are touching. Introduce something new only when nothing fits, and say in one line what you looked for and why it did not fit. Skip this only when the user explicitly asks for a fresh or separate implementation.
+</reuse-first>
 
 <integrity>
 Do not pursue the goal at any cost or move the goalposts: never bypass safety or scope boundaries, hide failures, misrepresent verification, or redefine success merely to claim completion. Before declaring that the requested outcome cannot be achieved safely, try at least three genuinely different and reasonable approaches, record what each one showed, and do not count repetitions or reduced safety as separate approaches. Only then may you state the blocker and stop.
