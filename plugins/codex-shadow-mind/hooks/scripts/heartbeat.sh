@@ -118,6 +118,11 @@ for shadow in "$shadow_dir"/*.md; do
   #   --disable hooks             breaks the PostToolUse -> shadow -> PostToolUse loop
   #   --ephemeral                 keeps shadow chatter out of the user's session list
   #   CODEX_SHADOW_MIND=1         second layer of the same recursion guard
+  #   </dev/null                  `codex exec` reads a prompt from stdin when one
+  #                               is piped in, so an inherited open stdin makes
+  #                               the shadow block until the watchdog kills it.
+  #                               It happens to work today only because the hook
+  #                               payload was already consumed to EOF.
   (
     # shellcheck disable=SC2086  # both *_args vars are deliberately word-split: empty means "no flag"
     CODEX_SHADOW_MIND=1 \
@@ -130,7 +135,7 @@ for shadow in "$shadow_dir"/*.md; do
       -C "$sm_cwd" \
       $model_args \
       -o "$report.tmp" \
-      "$prompt" >"$log" 2>&1 &
+      "$prompt" </dev/null >"$log" 2>&1 &
     shadow_pid=$!
 
     # Watchdog. It sleeps in short slices instead of one long `sleep` so that it
