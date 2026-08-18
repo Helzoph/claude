@@ -1,0 +1,35 @@
+{
+  "name": "codex-shadow-mind",
+  "version": "0.1.0",
+  "description": "Parallel read-only reviewer agents that watch Codex edit code and report architectural drift, invented APIs, and premature completion claims back into the main agent's context.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "codex",
+    "hooks",
+    "code-review",
+    "subagent",
+    "hallucination",
+    "architecture"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Codex Shadow Mind",
+    "shortDescription": "Background reviewers that audit Codex while it codes",
+    "longDescription": "Runs specialised read-only reviewer agents alongside the main Codex session. After every few edits a shadow reviews the recent transcript and reports concrete findings through additionalContext; at end of turn a completion gate can send Codex back to finish work it declared done. Shadows are plain Markdown files you can edit or add to.",
+    "developerName": "helzoph",
+    "category": "Development",
+    "capabilities": [
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "Show me which shadow minds are active and what they last reported.",
+      "Add a shadow mind that reviews test coverage after each change."
+    ]
+  }
+}
