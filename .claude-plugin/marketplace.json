@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "rationale-toolkit",
-      "description": "Rationale-first coding style and outcome-verification discipline: explain the why before the what, and prove changes work before calling them done.",
+      "description": "Rationale-first coding style and outcome-verification discipline: explain the why before the what, and prove changes work before calling them done. Ships an optional ELI5 output style for plain-language explanations.",
       "source": "./plugins/rationale-toolkit",
       "category": "development"
     },

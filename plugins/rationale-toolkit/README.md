@@ -15,6 +15,24 @@ A Claude Code plugin that enforces a rationale-first working style: explain
 Skills activate automatically when Claude Code judges the task matches their
 description — no manual invocation needed.
 
+### Output styles
+
+| Style | What it does |
+|---|---|
+| [`ELI5`](output-styles/eli5.md) | Explains everything in plain language a beginner can follow — jargon defined inline, everyday analogies over abstract vocabulary — without padding the response or sacrificing accuracy. Code, comments, commit messages, and identifiers keep their normal technical register. |
+
+Unlike skills, an output style is **not** automatic: only one can be active at a
+time, so you select it explicitly. Run `/config`, pick **Output style** → **ELI5**,
+then `/clear` — the output style is part of the system prompt, which Claude Code
+reads once at session start.
+
+It sets `keep-coding-instructions: true`, so Claude Code's built-in software
+engineering behaviour (change scoping, comment conventions, verification) is
+preserved. This style changes how work is *explained*, not how it is *done*.
+
+Note that output styles apply to the main conversation only — a subagent runs its
+own system prompt and is unaffected.
+
 ## Installation
 
 From within Claude Code:

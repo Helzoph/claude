@@ -1,7 +1,7 @@
 {
   "name": "rationale-toolkit",
   "version": "0.1.0",
-  "description": "Rationale-first coding style and outcome-verification discipline for Claude Code: explain the why before the what, and prove changes work before calling them done.",
+  "description": "Rationale-first coding style and outcome-verification discipline for Claude Code: explain the why before the what, and prove changes work before calling them done. Ships an optional ELI5 output style for plain-language explanations.",
   "author": {
     "name": "helzoph"
   },
@@ -14,6 +14,8 @@
     "testing",
     "verification",
     "quality",
-    "style"
+    "style",
+    "eli5",
+    "output-style"
   ]
 }
