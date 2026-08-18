@@ -17,7 +17,7 @@ source=$(printf '%s' "$SM_PAYLOAD" | jq -r '.source // "startup"' 2>/dev/null)
 if [ "$source" = "startup" ] || [ "$source" = "clear" ]; then
   rm -f "$sm_state_dir/edit-count" "$sm_state_dir/last-digest" "$sm_state_dir/gate-used" 2>/dev/null
   rm -f "$sm_state_dir"/reports/*.md 2>/dev/null
-  rm -rf "$sm_state_dir"/slot.*.lock 2>/dev/null
+  rm -rf "$sm_state_dir"/slot.*.lock "$sm_state_dir/count.lock" 2>/dev/null
 fi
 
 exit 0

@@ -28,12 +28,7 @@ model=$(sm_config model "")
 # Reviewing after every single edit is both expensive and useless: mid-refactor
 # code is supposed to look broken. Counting edits and firing every Nth gives the
 # main agent room to finish a coherent unit of work first.
-counter_file="$sm_state_dir/edit-count"
-count=$(cat "$counter_file" 2>/dev/null || printf '0')
-case "$count" in *[!0-9]*|'') count=0 ;; esac
-count=$((count + 1))
-printf '%s' "$count" > "$counter_file"
-
+count=$(sm_bump_counter) || exit 0
 [ $((count % interval)) -eq 0 ] || exit 0
 
 # --- transcript -----------------------------------------------------------
@@ -107,13 +102,15 @@ for shadow in "$shadow_dir"/*.md; do
   model_args=""
   [ -n "$shadow_model" ] && model_args="--model $shadow_model"
 
-  # A hung shadow must not hold its slot for the rest of the session. `timeout`
-  # is not in POSIX; where it is missing the stale-lock reaper is the backstop.
-  SM_TIMEOUT_CMD=""
+  # `timeout` is a GNU coreutils program, not POSIX, and macOS ships without it
+  # — which is where this plugin is developed. Relying on it alone silently
+  # disables every per-shadow deadline on the most likely platform, so the
+  # fallback is a watchdog we run ourselves.
+  timeout_cmd=""
   if command -v timeout >/dev/null 2>&1; then
-    SM_TIMEOUT_CMD="timeout -k 5 $timeout_seconds"
+    timeout_cmd="timeout -k 5 $timeout_seconds"
   elif command -v gtimeout >/dev/null 2>&1; then
-    SM_TIMEOUT_CMD="gtimeout -k 5 $timeout_seconds"
+    timeout_cmd="gtimeout -k 5 $timeout_seconds"
   fi
 
   # The subprocess is the enforcement point for read-only review:
@@ -122,9 +119,9 @@ for shadow in "$shadow_dir"/*.md; do
   #   --ephemeral                 keeps shadow chatter out of the user's session list
   #   CODEX_SHADOW_MIND=1         second layer of the same recursion guard
   (
-    # shellcheck disable=SC2086  # model_args is deliberately word-split: empty means "no flag"
+    # shellcheck disable=SC2086  # both *_args vars are deliberately word-split: empty means "no flag"
     CODEX_SHADOW_MIND=1 \
-    $SM_TIMEOUT_CMD codex exec \
+    $timeout_cmd codex exec \
       --sandbox read-only \
       --disable hooks \
       --ephemeral \
@@ -133,8 +130,42 @@ for shadow in "$shadow_dir"/*.md; do
       -C "$sm_cwd" \
       $model_args \
       -o "$report.tmp" \
-      "$prompt" >"$log" 2>&1
+      "$prompt" >"$log" 2>&1 &
+    shadow_pid=$!
 
+    # Watchdog. It sleeps in short slices instead of one long `sleep` so that it
+    # exits as soon as the shadow finishes — a single `sleep $timeout` would sit
+    # there for the full deadline after every fast review, leaving stray
+    # processes for as long as the session lasts.
+    if [ -z "$timeout_cmd" ]; then
+      (
+        waited=0
+        while [ "$waited" -lt "$timeout_seconds" ]; do
+          kill -0 "$shadow_pid" 2>/dev/null || exit 0
+          sleep 2
+          waited=$((waited + 2))
+        done
+        kill "$shadow_pid" 2>/dev/null || :
+        sleep 5
+        kill -9 "$shadow_pid" 2>/dev/null || :
+      ) &
+      watchdog_pid=$!
+    else
+      watchdog_pid=""
+    fi
+
+    wait "$shadow_pid" 2>/dev/null
+
+    # Killing the watchdog makes the shell announce the job as Terminated on
+    # stderr, which Codex surfaces to the user as a hook warning. Disowning it
+    # first keeps a routine cleanup from looking like a failure.
+    if [ -n "$watchdog_pid" ]; then
+      kill "$watchdog_pid" 2>/dev/null || :
+      wait "$watchdog_pid" 2>/dev/null || :
+    fi
+
+    # A killed shadow leaves whatever partial text it had written; only a run
+    # that finished with something to say should reach the main agent.
     if [ -s "$report.tmp" ] && ! grep -q 'NO_FINDINGS' "$report.tmp"; then
       mv "$report.tmp" "$report"
     else

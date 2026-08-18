@@ -226,6 +226,46 @@ sm_emit_block() {
 # Sets SM_SLOT to the acquired lock path. The caller is responsible for removing
 # it — in practice the subshell that owns the shadow process does so, since only
 # it knows when its child has exited.
+# Increments the heartbeat counter and prints the new value.
+#
+# This looks like it could be a plain read-add-write, and it cannot: the hook is
+# async, so a heartbeat that is off dispatching shadows for half a minute is
+# still running when the next edits fire their own hooks. Those overlap, and an
+# unlocked counter lets the slow one write back the value it read at the start —
+# the counter goes *backwards* and the heartbeat silently stops firing.
+#
+# The lock covers only the read-modify-write, never the dispatch that follows;
+# holding it across the slow part would just make the fast callers time out and
+# lose their increments by a different route.
+sm_bump_counter() {
+  _file="$sm_state_dir/edit-count"
+  _lock="$sm_state_dir/count.lock"
+  _tries=0
+
+  while [ "$_tries" -lt 50 ]; do
+    # Reclaim a lock orphaned by a killed hook. One minute is far longer than
+    # the few milliseconds this critical section actually takes.
+    if [ -d "$_lock" ] && [ -z "$(find "$_lock" -maxdepth 0 -mmin -1 2>/dev/null)" ]; then
+      rm -rf "$_lock" 2>/dev/null || :
+    fi
+    if mkdir "$_lock" 2>/dev/null; then
+      _count=$(cat "$_file" 2>/dev/null || printf '0')
+      case "$_count" in *[!0-9]*|'') _count=0 ;; esac
+      _count=$((_count + 1))
+      printf '%s' "$_count" > "$_file"
+      rmdir "$_lock" 2>/dev/null || :
+      printf '%s' "$_count"
+      return 0
+    fi
+    sleep 0.02 2>/dev/null || sleep 1
+    _tries=$((_tries + 1))
+  done
+
+  # Contended past the retry budget. Skipping this round is the safe failure:
+  # a missed review beats a wrong count that stalls every future heartbeat.
+  return 1
+}
+
 sm_acquire_slot() {
   _max=$1
   _stale_minutes=$2
