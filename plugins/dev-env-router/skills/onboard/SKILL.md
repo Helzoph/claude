@@ -56,19 +56,32 @@ services:
         required: false                    # 大多数 worktree 没有这个文件
 ```
 
-baseline 选哪一个，用和宿主机侧**完全相同**的规则：`~/.local/share/dev-env/env/<repo>.env` 存在就用它，否则回退 `~/.local/share/dev-env/env/dev.env`，两个都没有就停下来问用户。完整规则见 `mise-toolchain` 插件的 `link-env` skill——两侧必须选中同一个文件，否则就会出现"容器里跑得通、宿主机跑不通"。
+### 选哪一份 baseline
 
-几个必须注意的点：
+跑这条判定，把输出的文件名填进上面的 `env_file`（只做存在性检查，不读内容）：
+
+```bash
+REPO=$(basename "$(git rev-parse --path-format=absolute --git-common-dir | xargs dirname)")
+ENVDIR=~/.local/share/dev-env/env
+test -f "$ENVDIR/$REPO.env" && echo "$REPO.env" || { test -f "$ENVDIR/dev.env" && echo dev.env; }
+```
+
+没有任何输出时**停下来问用户**，不要代为创建，也不要转而去读项目自己的 `.env`。
+
+两条硬约束（不因为规则真源在别处就放松）：
+
+- **不要在 `~/.local/share/dev-env/env/` 下创建任何文件**，那个目录只由用户手动维护。
+- **不要读取、打印或复制 baseline 与 `.env.local` 的内容**，这里只需要把路径接上。
+
+> **规则真源：`mise-toolchain` 插件的 `link-env` skill。** 上面这条判定的完整版本、以及各条约束背后的理由（为什么两个 baseline 是替换而非补丁关系、为什么 agent 不能代为创建）都写在那里，本节不重复。宿主机侧（`npm run dev` 这类）由 `link-env` 写 `mise.local.toml` 接同一份 baseline——两侧**必须选中同一个文件**，否则会出现"容器里跑得通、宿主机跑不通"这类最难排查的问题。两个插件各写各的文件，不共享配置。
+
+### 容器侧特有的坑
+
+这三条只在 Compose 这边成立，`link-env` 里没有：
 
 - **`env_file` 不展开 `~`**，必须写 `${HOME}` 或绝对路径。写成 `~/...` 时 Compose 会当作字面量目录名去找，报文件不存在。这一点和 mise 的 `_.file` 相反（那边 `~` 会展开），两处配置容易互相照抄写错。
 - `required: false` 需要 Compose 2.24+。低版本会因为无法识别长语法而报错。
-- `<repo>` 用**仓库名**而非 worktree 目录名。在 worktree 里 `git rev-parse --show-toplevel` 返回的是 worktree 目录名（会选错），要用 `basename "$(git rev-parse --path-format=absolute --git-common-dir | xargs dirname)"`。
-- **不要在 `~/.local/share/dev-env/env/` 下创建任何文件**，那个目录只由用户手动维护。
 - 写在 `docker-compose.override.yml` 而不是 `docker-compose.yml`：后者要进 git，写入机器级绝对路径会让配置不可移植，且每个 worktree 改同一行必然产生 merge 冲突。
-
-**不要读取、打印或复制 baseline 与 `.env.local` 的内容**，这里只需要把路径接上。baseline 本身的创建（`mkdir` / `mv` / `chmod 600`）应当由用户自己执行，把命令告诉他即可。
-
-宿主机侧如果也要跑同一个项目（`npm run dev` 这类），必须读**同一份 baseline**，否则会出现"容器里跑得通、宿主机跑不通"这类难排查的问题。宿主机侧的接法归 `mise-toolchain` 插件的 `link-env` skill 管（写在 `mise.local.toml` 里）；两边通过约定同一个 baseline 路径协作，不共享配置文件。
 
 ## 后续
 

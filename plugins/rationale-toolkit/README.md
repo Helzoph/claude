@@ -33,6 +33,20 @@ preserved. This style changes how work is *explained*, not how it is *done*.
 Note that output styles apply to the main conversation only — a subagent runs its
 own system prompt and is unaffected.
 
+### Hooks
+
+| Hook | Event | What it does |
+|---|---|---|
+| [`block-node-modules-bin`](hooks/scripts/block-node-modules-bin.sh) | `PreToolUse` (Bash) | Denies any Bash command containing `node_modules/.bin/`, naming the binary and pointing at the alternatives: a system-installed command first, then `pnpm exec` / `npx` / `bunx`. |
+
+`node_modules/.bin/<tool>` bakes in one package manager's on-disk layout — pnpm's
+store is not flat and Yarn PnP has no `.bin` directory at all — and it silently
+prefers a vendored copy over a newer system install. Going through a runner keeps
+the same command working across package managers.
+
+The hook fails open: if `jq` is missing it exits without a verdict rather than
+blocking every Bash call. Unlike an output style, hooks also apply to subagents.
+
 ## Installation
 
 From within Claude Code:

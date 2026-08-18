@@ -20,7 +20,7 @@
   "interface": {
     "displayName": "Rationale Toolkit",
     "shortDescription": "Rationale-first coding and outcome verification",
-    "longDescription": "Reusable skills for explaining design choices, reviewing code, and verifying outcomes before declaring work complete.",
+    "longDescription": "Reusable skills for explaining design choices, reviewing code, and verifying outcomes before declaring work complete, plus a pre-tool hook that blocks direct node_modules/.bin/ invocations in favour of a system command or a package-manager runner.",
     "developerName": "helzoph",
     "category": "Development",
     "capabilities": [

@@ -13,6 +13,17 @@
 - Use `operate` when starting, stopping, or restarting an already onboarded project, or when reporting its routed URL.
 </dev-env-router>
 
+<mise-toolchain>
+- Use `setup-toolchain` when pinning language/CLI versions in a project's `mise.toml`.
+- Use `link-env` when a worktree needs env vars from the shared baseline in `~/.local/share/dev-env/env/`. It is the single source of truth for the baseline selection rule; `dev-env-router/onboard` applies the same rule on the container side.
+- Never read, print, or copy the contents of any file under `~/.local/share/dev-env/env/`, and never create files there — the user provisions those by hand.
+</mise-toolchain>
+
+<dev-credentials>
+- Use `use-dev-credentials` when a task needs a real API key to actually run or test something. Read `~/.local/share/dev-env/credentials.json` — reading it is authorized, unlike `env/` above — and pass values straight into the command instead of printing them.
+- Never fall back to a project's own `.env` for credentials.
+</dev-credentials>
+
 <emil-design-skills>
 - Use `emil-design-eng` for UI polish, component design, and animation decisions.
 - Use `animate` when building a new animation, transition, or motion interaction.

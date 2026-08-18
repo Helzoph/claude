@@ -1,0 +1,17 @@
+{
+  "description": "Blocks direct node_modules/.bin/<tool> invocations and redirects to a system-installed command or a package-manager runner (pnpm exec / npx / bunx).",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/block-node-modules-bin.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
