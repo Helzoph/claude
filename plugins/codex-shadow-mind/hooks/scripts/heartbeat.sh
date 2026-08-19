@@ -25,6 +25,12 @@ timeout_default=$(sm_config_int timeout_seconds 120)
 model=$(sm_config model "")
 
 # --- heartbeat ------------------------------------------------------------
+# Only calls that actually changed the repository count. The matcher had to be
+# widened to `exec` to fire at all on current Codex, and `exec` is also every
+# `cat`, `rg` and `sed -n` the agent runs — the overwhelming majority of them.
+# Counting reads would pace the heartbeat off browsing rather than off work.
+sm_is_write "${sm_tool_input:-}" || exit 0
+
 # Reviewing after every single edit is both expensive and useless: mid-refactor
 # code is supposed to look broken. Counting edits and firing every Nth gives the
 # main agent room to finish a coherent unit of work first.

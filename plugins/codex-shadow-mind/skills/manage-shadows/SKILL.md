@@ -28,7 +28,7 @@ State root — `$PLUGIN_DATA`, defaulting to `~/.codex/shadow-mind/`:
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `true` | Master switch for dispatch. |
-| `heartbeat_interval` | `3` | Run a review round every Nth matched tool call. |
+| `heartbeat_interval` | `3` | Run a review round every Nth file-changing tool call. Reads are not counted — on current Codex almost every tool call is `exec`, and most of those are `cat`/`rg`/`sed -n`. |
 | `max_parallel` | `2` | Shadows allowed to run at once. |
 | `transcript_turns` | `40` | Transcript lines handed to each shadow. |
 | `timeout_seconds` | `120` | Default per-shadow wall clock. |

@@ -1,5 +1,5 @@
 {
-  "description": "Runs read-only shadow reviewers alongside the main Codex agent: a heartbeat after edits dispatches them in the background, and an end-of-turn gate replays anything they found.",
+  "description": "Runs read-only shadow reviewers alongside the main Codex agent: a heartbeat after edits dispatches them in the background, and an end-of-turn gate replays anything they found. The PostToolUse matcher lists tool names across Codex versions: 0.147 routes nearly everything through a single `exec` tool whose JS payload calls `tools.exec_command(...)`, while older builds exposed `exec_command` and `apply_patch` as tool names in their own right. Matching only the latter makes the heartbeat never fire on current Codex.",
   "hooks": {
     "SessionStart": [
       {
@@ -14,7 +14,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "apply_patch|Edit|Write|Bash|exec_command|shell",
+        "matcher": "^(exec|exec_command|shell|Bash|apply_patch|Edit|Write)$",
         "hooks": [
           {
             "type": "command",
