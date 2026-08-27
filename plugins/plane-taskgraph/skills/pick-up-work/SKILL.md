@@ -1,6 +1,6 @@
 ---
 name: pick-up-work
-description: "Read a feature's task graph back from Plane and compute which work items can start right now, by checking whether each item's blocked_by dependencies are all done. Use this skill when picking up work on a feature already recorded in Plane — triggers on 'implement the xxx feature', 'what can I work on next', 'what's unblocked'. Requires the Plane MCP server. Do NOT use for writing a new plan into Plane (use plan-to-plane instead)."
+description: "Read a feature's task graph back from Plane and compute which work items can start right now, by checking whether each item's blocked_by dependencies are all done. Use this skill when picking up work on a feature already recorded in Plane — triggers on 'implement the xxx feature', 'what can I work on next', 'what's unblocked'. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane instead)."
 ---
 
 # 从 Plane 读回任务图，算出现在能开工的

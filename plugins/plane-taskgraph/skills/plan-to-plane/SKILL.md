@@ -1,6 +1,6 @@
 ---
 name: plan-to-plane
-description: "Record a design discussion into Plane as a structured task graph: one Module per feature, work items sized to a single reviewable change, and ordering expressed as blocked_by relations rather than prose. Use this skill after discussing what to build, whenever the outcome should be written into Plane — triggers on 'record this into Plane', 'create issues for this', 'plan out this feature'. Requires the Plane MCP server. Do NOT use for reading an existing plan back or deciding what to work on next (use pick-up-work instead)."
+description: "Record a design discussion into Plane as a structured task graph: one Module per feature, work items sized to a single reviewable change, and ordering expressed as blocked_by relations rather than prose. Use this skill after discussing what to build, whenever the outcome should be written into Plane — triggers on 'record this into Plane', 'create issues for this', 'plan out this feature'. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for reading an existing plan back or deciding what to work on next (use pick-up-work instead)."
 ---
 
 # 把设计讨论落成 Plane 里的任务图
