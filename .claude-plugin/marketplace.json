@@ -31,6 +31,12 @@
       "category": "development"
     },
     {
+      "name": "plane-taskgraph",
+      "description": "Turn design conversations into a structured task graph in Plane: features become Modules, ordering becomes blocked_by relations, and \"what can start now\" is computed from the graph instead of stored as prose.",
+      "source": "./plugins/plane-taskgraph",
+      "category": "development"
+    },
+    {
       "name": "codex-shadow-mind",
       "description": "Codex-only: read-only reviewer agents that run in parallel with the main agent, catching architectural drift, invented APIs and premature completion claims while the work is still warm. Built on Codex hooks, with no Claude Code equivalent.",
       "source": "./plugins/codex-shadow-mind",
