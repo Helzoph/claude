@@ -20,11 +20,18 @@ description — no manual invocation needed.
 | Style | What it does |
 |---|---|
 | [`ELI5`](output-styles/eli5.md) | Explains everything in plain language a beginner can follow — jargon defined inline, everyday analogies over abstract vocabulary — without padding the response or sacrificing accuracy. Code, comments, commit messages, and identifiers keep their normal technical register. |
+| [`ELI15`](output-styles/eli15.md) | Assumes the reader writes code but doesn't know this domain: programming fundamentals go unexplained, domain terms get one clause on first use, and the words saved go into behaviour, boundary conditions, and failure modes. Also requires every response that did work to close with what changed, whether it's finished, and what the user must do next. |
+
+Pick **ELI5** when the reader is new to programming. Pick **ELI15** when they can
+code but the domain is unfamiliar — and when you want the status of the work
+stated explicitly rather than buried in the explanation. ELI15's status section
+governs only the *wording* of that report; how deeply to verify and what the
+report must contain stay with [`verify-outcomes`](skills/verify-outcomes/SKILL.md).
 
 Unlike skills, an output style is **not** automatic: only one can be active at a
-time, so you select it explicitly. Run `/config`, pick **Output style** → **ELI5**,
-then `/clear` — the output style is part of the system prompt, which Claude Code
-reads once at session start.
+time, so you select it explicitly. Run `/config`, pick **Output style** → the one
+you want, then `/clear` — the output style is part of the system prompt, which
+Claude Code reads once at session start.
 
 It sets `keep-coding-instructions: true`, so Claude Code's built-in software
 engineering behaviour (change scoping, comment conventions, verification) is
