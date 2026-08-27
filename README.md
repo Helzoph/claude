@@ -37,7 +37,7 @@ before it runs plugin-bundled hooks.
 
 | Plugin | Description |
 |---|---|
-| [`rationale-toolkit`](plugins/rationale-toolkit) | Rationale-first coding style and outcome-verification discipline — explain the why before the what, and prove changes work before calling them done. Ships an ELI5 output style and a `node_modules/.bin` guard hook. |
+| [`rationale-toolkit`](plugins/rationale-toolkit) | Rationale-first coding style and outcome-verification discipline — explain the why before the what, and prove changes work before calling them done. Ships an ELI15 output style and a `node_modules/.bin` guard hook. |
 | [`dev-env-router`](plugins/dev-env-router) | Directory-derived identity for local dev environments via Docker Compose + a single shared Traefik router — no manual port bookkeeping across projects and worktrees. |
 | [`mise-toolchain`](plugins/mise-toolchain) | Project toolchain versions and cross-worktree env layering via mise — inherit the machine's own version preferences into `mise.toml`, and share one baseline `.env` across worktrees without copying secrets around. |
 | [`dev-credentials`](plugins/dev-credentials) | A single machine-level file holding budget-capped dev credentials an agent is explicitly allowed to read, so real project secrets never have to be exposed to get a test run working. |
@@ -70,7 +70,7 @@ skills stay current without silently changing the marketplace.
 │   ├── rationale-toolkit/
 │   │   ├── .claude-plugin/plugin.json  # Claude Code manifest
 │   │   ├── .codex-plugin/plugin.json   # Codex manifest
-│   │   ├── output-styles/eli5.md       # Optional plain-language output style
+│   │   ├── output-styles/eli15.md      # Optional plain-language output style
 │   │   └── hooks/hooks.json            # PreToolUse: node_modules/.bin guard
 │   ├── emil-design-skills/
 │   │   ├── .claude-plugin/plugin.json  # Claude Code manifest
