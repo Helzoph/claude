@@ -1,0 +1,19 @@
+{
+  "name": "plane-taskgraph",
+  "version": "0.1.0",
+  "description": "Turn design conversations into a structured task graph in Plane: features become Modules, ordering becomes blocked_by relations, and \"what can start now\" is computed from the graph instead of stored as prose.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "plane",
+    "issue-tracking",
+    "task-graph",
+    "dependencies",
+    "mcp",
+    "planning"
+  ]
+}

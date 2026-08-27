@@ -31,6 +31,12 @@
       "category": "development"
     },
     {
+      "name": "plane-taskgraph",
+      "description": "Turn design conversations into a structured task graph in Plane: features become Modules, ordering becomes blocked_by relations, and \"what can start now\" is computed from the graph instead of stored as prose.",
+      "source": "./plugins/plane-taskgraph",
+      "category": "development"
+    },
+    {
       "name": "emil-design-skills",
       "description": "Polished interface design, animation, motion review, and frontend tooling skills by Emil Kowalski.",
       "source": "./plugins/emil-design-skills",

@@ -1,0 +1,35 @@
+{
+  "name": "plane-taskgraph",
+  "version": "0.1.0",
+  "description": "Structured task graphs in Plane: features as Modules, ordering as blocked_by relations, parallelism computed rather than stored.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "plane",
+    "issue-tracking",
+    "task-graph",
+    "dependencies",
+    "mcp",
+    "planning"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Plane Task Graph",
+    "shortDescription": "Design talk in, structured Plane task graph out",
+    "longDescription": "Skills for recording a design discussion into Plane as a dependency graph (Module per feature, blocked_by relations for ordering), and for reading it back to compute which work items can start in parallel right now.",
+    "developerName": "helzoph",
+    "category": "Development",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "把刚才讨论的设计记到 Plane 里。",
+      "帮我实现 xxx feature。"
+    ]
+  }
+}
