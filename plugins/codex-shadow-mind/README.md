@@ -9,6 +9,13 @@ report what they find back into its context.
 equivalent `additionalContext`-from-background-review path, so there is no
 `.claude-plugin/` manifest here and nothing to install on that side.
 
+For the same reason it is **deliberately absent** from this repository's
+`.claude-plugin/marketplace.json`. That file is Claude Code's plugin index and
+carries no per-platform field, so anything listed there shows up as installable
+in `/plugin` — and installing this one would attach no hooks and no skills.
+Codex does not read the marketplace manifest; it discovers the plugin from
+`.codex-plugin/plugin.json` in this directory. Do not "fix" the missing entry.
+
 Inspired by [pi-shadow-mind](https://github.com/liuzhengdongfortest/pi-shadow-mind),
 rebuilt against Codex's hook and sandbox model.
 

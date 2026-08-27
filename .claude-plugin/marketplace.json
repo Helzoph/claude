@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "rationale-toolkit",
-      "description": "Rationale-first coding style and outcome-verification discipline: explain the why before the what, and prove changes work before calling them done. Ships an optional ELI5 output style for plain-language explanations, and a hook that blocks direct node_modules/.bin/ invocations.",
+      "description": "Rationale-first coding style and outcome-verification discipline: explain the why before the what, and prove changes work before calling them done. Ships an optional ELI15 output style for plain-language explanations that always state what changed and what the user must do next, and a hook that blocks direct node_modules/.bin/ invocations.",
       "source": "./plugins/rationale-toolkit",
       "category": "development"
     },
@@ -28,12 +28,6 @@
       "name": "dev-credentials",
       "description": "A single machine-level file holding budget-capped dev credentials that an agent is explicitly allowed to read and use for testing, so real project secrets never have to be exposed to get a test run working.",
       "source": "./plugins/dev-credentials",
-      "category": "development"
-    },
-    {
-      "name": "codex-shadow-mind",
-      "description": "Codex-only: read-only reviewer agents that run in parallel with the main agent, catching architectural drift, invented APIs and premature completion claims while the work is still warm. Built on Codex hooks, with no Claude Code equivalent.",
-      "source": "./plugins/codex-shadow-mind",
       "category": "development"
     },
     {
