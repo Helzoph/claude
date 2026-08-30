@@ -1,6 +1,6 @@
 ---
 name: pick-up-work
-description: "Read a feature's task graph back from Plane and compute which work items can start right now, by checking whether each item's blocked_by dependencies are all done. Use this skill when picking up work on a feature already recorded in Plane — triggers on 'implement the xxx feature', 'what can I work on next', 'what's unblocked'. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane instead)."
+description: "Read a feature's task graph back from Plane and compute which work items can start right now, by checking whether each item's blocked_by dependencies are all done; when the unblocked item is a Module's acceptance item, run its listed tests and record the outcome. Use this skill when picking up work on a feature already recorded in Plane — triggers on 'implement the xxx feature', 'what can I work on next', 'what's unblocked', 'is this module done'. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane instead)."
 ---
 
 # 从 Plane 读回任务图，算出现在能开工的
@@ -81,9 +81,24 @@ group 固定为五个：`backlog` / `unstarted` / `started` / `completed` / `can
 
 description 里应该有 `完成标准` 这一段（见 `plan-to-plane` 的模板）。**没有的话停下来问用户**，不要凭标题推断什么算做完。
 
+⚠️ **验收 item 是例外**：它的模板里是「完成定义」+「必须通过的测试」，没有「完成标准」。别把它当成缺模板——先按下一节认出它，再走那边的流程。
+
 原因：标题只说了要做什么，没说做到哪儿算完。凭标题猜的验收标准和用户心里的那个不一致时，你会在自认为完成的地方停下，而用户拿到的是个半成品——**而且双方都不知道错在哪一步**。
 
 老 item 缺这一段是正常的（模板是后来才有的）。补一句问清楚，顺手 `workitem(action="update")` 把它补进 description，下次就不用再问。
+
+## 浮上来的是验收 item（`<module 名> 验收`）时
+
+它 `blocked_by` 整个 module 的所有其他 item，所以它变成可开工 **= 这个 module 的活全干完了**，该验收了。
+
+这时不要写代码。读它的 description，**逐条跑「必须通过的测试」里列的命令**，一条都不许跳过或换成"看起来等价"的。
+
+- **全过** → 记一条评论（`workitem_comment(action="create", comment_html=...)`，字段是 HTML，不是纯文本）：跑了哪些、各自什么结果。然后把 state 改成 completed 组。
+- **有挂的** → **不要**把验收 item 改成完成。挂掉的那条说明 module 还没做完：把失败内容记成评论，然后跟用户确认是去修某个已有 item，还是这里少了一个 item。
+
+评论记结果、description 记标准，**两者不要混**。跑挂了就去改 description 里的验收标准，是把尺子改短来适应结果——下次读的人无从知道标准被改过。
+
+description 里没有「必须通过的测试」这一段（老 module，或验收 item 是后补的）→ **停下来问用户**，不要自己挑几个测试跑跑就算验收过了。
 
 ## 报告给用户
 
