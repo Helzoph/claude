@@ -1,0 +1,21 @@
+{
+  "name": "env-tiers",
+  "version": "0.1.0",
+  "description": "Three local environment tiers (worktree dev -> UAT -> prod) whose identity is derived from the directory name, so a wrong tier fails loudly instead of silently running the wrong config. Ships a command-entrypoint template and a prod guard hook that hard-blocks the irreversible commands.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "docker-compose",
+    "git-worktree",
+    "uat",
+    "staging",
+    "production",
+    "guardrails",
+    "justfile",
+    "hooks"
+  ]
+}

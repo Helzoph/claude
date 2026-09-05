@@ -1,0 +1,90 @@
+# 三层环境共用这一份命令入口,靠目录名自己判断身份。
+#
+# 为什么判据是目录名,而不是分支名或一个 ENV 开关:
+# Docker Compose 的项目名默认取目录名,容器名和卷名都带这个前缀,所以目录名
+# 已经是「这条命令会动到哪一套数据」的事实判据。护栏 hook 用的也是它。再引入
+# 第三种真相来源就会有「两处说这是 UAT、一处说是正式」的状态。分支尤其不能用:
+# 分支能被 checkout 改掉,目录不会。
+#
+# 直接后果:UAT 的目录必须叫 __UAT_DIR__。换个名字不会报错,只会安静地退回开发
+# 配置——这正是下面 `up` 要防的那件事,所以 _guard-dev 把它变成当场失败。
+#
+# 占位符由 env-tiers/setup-tiers skill 填写:
+#   __PROD_DIR__      正式环境的目录名
+#   __UAT_DIR__       UAT 的目录名
+#   __PROD_OVERRIDE__ 正式环境必须带上的 compose override 文件名
+
+project := file_name(justfile_directory())
+
+# 三层:__PROD_DIR__=正式, __UAT_DIR__=UAT, 其它=worktree 开发副本(不起容器)
+layer := if project == "__PROD_DIR__" { "prod" } else if project == "__UAT_DIR__" { "uat" } else { "dev" }
+
+# 正式环境永远带 override。把它放进变量而不是让人记在命令行上,是这份文件存在
+# 的主要理由:不带 override 的 `up` 不会报错,它会静默地把源码 bind mount 回来。
+compose := if layer == "prod" {
+    "docker compose -f docker-compose.yml -f __PROD_OVERRIDE__"
+} else {
+    "docker compose"
+}
+
+# 正式环境的源码烤在镜像里,不 --build 就等于什么都没更新——而容器照样起来,
+# 页面照样能开,只是跑的还是上一版代码。UAT 是 bind mount,不需要。
+build_flag := if layer == "prod" { "--build" } else { "" }
+
+url := "http://" + project + ".localhost"
+
+_default:
+    @just --list --unsorted
+
+# 这一层是什么、会用哪些文件、地址是什么。不确定自己在哪一层时先跑这个
+[group('环境')]
+env:
+    @echo "目录    {{ project }}"
+    @echo "层      {{ layer }}"
+    @echo "compose {{ compose }}"
+    @echo "地址    {{ if layer == 'dev' { '(worktree 不起容器)' } else { url } }}"
+
+# worktree 里起容器是没有意义的:COMPOSE_PROJECT_NAME 会变成 worktree 的目录名,
+# 于是容器落在一个没人访问的域名上,卷也和 UAT/正式不共享——起来了,但没用。
+# 与其静默起一套孤儿容器,不如在这里停下。
+_guard-dev:
+    @if [ "{{ layer }}" = "dev" ]; then \
+        echo "这里是 worktree({{ project }}),不起容器。" >&2; \
+        echo "  改代码在这里,验证去 __UAT_DIR__/,上线在 __PROD_DIR__/。" >&2; \
+        exit 1; \
+    fi
+
+# 起。正式自动带 override 和 --build,UAT 用基础配置
+[group('容器')]
+up *ARGS: _guard-dev
+    {{ compose }} up -d {{ build_flag }} {{ ARGS }}
+    @echo ""
+    @echo "→ {{ url }}"
+
+# 停。刻意不提供 -v:那会删掉正式环境的数据卷。要清数据去 UAT 手敲完整命令
+[group('容器')]
+down:
+    {{ compose }} down
+
+# 重启。改了 .env 之类不需要重建镜像的东西时用
+[group('容器')]
+restart *ARGS: _guard-dev
+    {{ compose }} restart {{ ARGS }}
+    @echo ""
+    @echo "→ {{ url }}"
+
+# 容器状态
+[group('容器')]
+ps:
+    @{{ compose }} ps
+
+# 跟日志。不带参数是全部,也可以 `just logs <service>`
+[group('容器')]
+logs *ARGS:
+    {{ compose }} logs -f {{ ARGS }}
+
+# TODO(setup-tiers): 换成本项目实际的闸门命令(类型检查 + 测试 + 构建)。
+# 合并进 UAT 之前跑这个。
+[group('检查')]
+check:
+    @echo "TODO: 填入本项目的检查命令" && exit 1

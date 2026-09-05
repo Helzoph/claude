@@ -19,6 +19,12 @@
       "category": "development"
     },
     {
+      "name": "env-tiers",
+      "description": "Three local environment tiers (worktree dev -> UAT -> prod) whose identity is derived from the directory name, so a wrong tier fails loudly instead of silently running the wrong config. Ships a command-entrypoint template and a prod guard hook that hard-blocks the irreversible commands.",
+      "source": "./plugins/env-tiers",
+      "category": "development"
+    },
+    {
       "name": "mise-toolchain",
       "description": "Project toolchain versions and cross-worktree env layering via mise: inherit the machine's own version preferences into mise.toml, and share one baseline .env across worktrees without copying secrets around.",
       "source": "./plugins/mise-toolchain",

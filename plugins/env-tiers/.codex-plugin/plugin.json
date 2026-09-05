@@ -1,0 +1,37 @@
+{
+  "name": "env-tiers",
+  "version": "0.1.0",
+  "description": "Directory-derived three-tier local environments (worktree dev -> UAT -> prod) with a prod guardrail hook, for Claude Code and Codex.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "docker-compose",
+    "git-worktree",
+    "uat",
+    "staging",
+    "production",
+    "guardrails",
+    "justfile",
+    "hooks"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Environment Tiers",
+    "shortDescription": "Directory-derived dev/UAT/prod tiers with a prod guardrail",
+    "longDescription": "Skills for laying out three local environment tiers whose identity comes from the directory name, wiring a project-local guard hook that blocks irreversible prod commands, running the branch flow that keeps an escape hatch open, and standing up a UAT tier without silently inheriting production side effects.",
+    "developerName": "helzoph",
+    "category": "Development",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Set up dev/UAT/prod tiers for this project.",
+      "Stand up a UAT environment alongside production."
+    ]
+  }
+}
