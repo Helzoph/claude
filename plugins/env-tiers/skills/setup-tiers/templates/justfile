@@ -1,34 +1,39 @@
-# 三层环境共用这一份命令入口,靠目录名自己判断身份。
+# All three environment tiers share this one command entrypoint and determine their identity from the directory name.
 #
-# 为什么判据是目录名,而不是分支名或一个 ENV 开关:
-# Docker Compose 的项目名默认取目录名,容器名和卷名都带这个前缀,所以目录名
-# 已经是「这条命令会动到哪一套数据」的事实判据。护栏 hook 用的也是它。再引入
-# 第三种真相来源就会有「两处说这是 UAT、一处说是正式」的状态。分支尤其不能用:
-# 分支能被 checkout 改掉,目录不会。
+# Why the criterion is the directory name, not the branch name or an ENV switch:
+# Docker Compose derives the project name from the directory name by default, and
+# container and volume names carry that prefix, so the directory name is already
+# the factual criterion for "which data set this command will touch". The guard
+# hook uses it too. Introducing a third source of truth would allow states where
+# "two places say this is UAT and one says prod". Branches in particular must not
+# be used: a checkout can change the branch, but not the directory.
 #
-# 直接后果:UAT 的目录必须叫 __UAT_DIR__。换个名字不会报错,只会安静地退回开发
-# 配置——这正是下面 `up` 要防的那件事,所以 _guard-dev 把它变成当场失败。
+# Direct consequence: the UAT directory must be named __UAT_DIR__. A different name
+# does not raise an error; it just quietly falls back to the dev config — exactly
+# what `up` below is meant to prevent, so _guard-dev turns it into an immediate failure.
 #
-# 占位符由 env-tiers/setup-tiers skill 填写:
-#   __PROD_DIR__      正式环境的目录名
-#   __UAT_DIR__       UAT 的目录名
-#   __PROD_OVERRIDE__ 正式环境必须带上的 compose override 文件名
+# Placeholders are filled in by the env-tiers/setup-tiers skill:
+#   __PROD_DIR__      the prod directory name
+#   __UAT_DIR__       the UAT directory name
+#   __PROD_OVERRIDE__ the compose override file name prod must always include
 
 project := file_name(justfile_directory())
 
-# 三层:__PROD_DIR__=正式, __UAT_DIR__=UAT, 其它=worktree 开发副本(不起容器)
+# Three tiers: __PROD_DIR__=prod, __UAT_DIR__=UAT, anything else=worktree dev copy (no containers)
 layer := if project == "__PROD_DIR__" { "prod" } else if project == "__UAT_DIR__" { "uat" } else { "dev" }
 
-# 正式环境永远带 override。把它放进变量而不是让人记在命令行上,是这份文件存在
-# 的主要理由:不带 override 的 `up` 不会报错,它会静默地把源码 bind mount 回来。
+# Prod always includes the override. Putting it in a variable instead of relying on
+# people to remember it on the command line is the main reason this file exists:
+# `up` without the override does not raise an error; it silently brings the source bind mount back.
 compose := if layer == "prod" {
     "docker compose -f docker-compose.yml -f __PROD_OVERRIDE__"
 } else {
     "docker compose"
 }
 
-# 正式环境的源码烤在镜像里,不 --build 就等于什么都没更新——而容器照样起来,
-# 页面照样能开,只是跑的还是上一版代码。UAT 是 bind mount,不需要。
+# Prod's source is baked into the image, so without --build nothing is updated —
+# yet the containers still start and the page still opens, just running the
+# previous version of the code. UAT uses a bind mount and does not need it.
 build_flag := if layer == "prod" { "--build" } else { "" }
 
 url := "http://" + project + ".localhost"
@@ -36,55 +41,56 @@ url := "http://" + project + ".localhost"
 _default:
     @just --list --unsorted
 
-# 这一层是什么、会用哪些文件、地址是什么。不确定自己在哪一层时先跑这个
-[group('环境')]
+# What this tier is, which files it uses, and its address. Run this first when unsure which tier you are in
+[group('env')]
 env:
-    @echo "目录    {{ project }}"
-    @echo "层      {{ layer }}"
+    @echo "dir     {{ project }}"
+    @echo "tier    {{ layer }}"
     @echo "compose {{ compose }}"
-    @echo "地址    {{ if layer == 'dev' { '(worktree 不起容器)' } else { url } }}"
+    @echo "url     {{ if layer == 'dev' { '(worktree, no containers)' } else { url } }}"
 
-# worktree 里起容器是没有意义的:COMPOSE_PROJECT_NAME 会变成 worktree 的目录名,
-# 于是容器落在一个没人访问的域名上,卷也和 UAT/正式不共享——起来了,但没用。
-# 与其静默起一套孤儿容器,不如在这里停下。
+# Starting containers in a worktree is pointless: COMPOSE_PROJECT_NAME becomes the
+# worktree's directory name, so the containers land on a hostname nobody visits,
+# and the volumes are not shared with UAT/prod — they start, but are useless.
+# Rather than silently start a set of orphan containers, stop here.
 _guard-dev:
     @if [ "{{ layer }}" = "dev" ]; then \
-        echo "这里是 worktree({{ project }}),不起容器。" >&2; \
-        echo "  改代码在这里,验证去 __UAT_DIR__/,上线在 __PROD_DIR__/。" >&2; \
+        echo "This is a worktree ({{ project }}); no containers are started here." >&2; \
+        echo "  Change code here, verify in __UAT_DIR__/, ship in __PROD_DIR__/." >&2; \
         exit 1; \
     fi
 
-# 起。正式自动带 override 和 --build,UAT 用基础配置
-[group('容器')]
+# Start. Prod automatically includes the override and --build; UAT uses the base config
+[group('containers')]
 up *ARGS: _guard-dev
     {{ compose }} up -d {{ build_flag }} {{ ARGS }}
     @echo ""
     @echo "→ {{ url }}"
 
-# 停。刻意不提供 -v:那会删掉正式环境的数据卷。要清数据去 UAT 手敲完整命令
-[group('容器')]
+# Stop. Deliberately does not offer -v: that would delete prod's data volume. To wipe data, go to UAT and type the full command by hand
+[group('containers')]
 down:
     {{ compose }} down
 
-# 重启。改了 .env 之类不需要重建镜像的东西时用
-[group('容器')]
+# Restart. Use when something that does not require rebuilding the image changed, such as .env
+[group('containers')]
 restart *ARGS: _guard-dev
     {{ compose }} restart {{ ARGS }}
     @echo ""
     @echo "→ {{ url }}"
 
-# 容器状态
-[group('容器')]
+# Container status
+[group('containers')]
 ps:
     @{{ compose }} ps
 
-# 跟日志。不带参数是全部,也可以 `just logs <service>`
-[group('容器')]
+# Follow logs. No arguments means all services; `just logs <service>` also works
+[group('containers')]
 logs *ARGS:
     {{ compose }} logs -f {{ ARGS }}
 
-# TODO(setup-tiers): 换成本项目实际的闸门命令(类型检查 + 测试 + 构建)。
-# 合并进 UAT 之前跑这个。
-[group('检查')]
+# TODO(setup-tiers): replace with this project's actual gate commands (type check + tests + build).
+# Run this before merging into UAT.
+[group('checks')]
 check:
-    @echo "TODO: 填入本项目的检查命令" && exit 1
+    @echo "TODO: fill in this project's check commands" && exit 1

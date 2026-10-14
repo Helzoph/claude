@@ -3,156 +3,158 @@ name: plan-to-plane
 description: "Record a design discussion into Plane as a structured task graph: one Module per feature, work items sized to a single reviewable change, ordering expressed as blocked_by relations rather than prose, and one acceptance work item per Module holding its definition of done and the tests that must pass. Use this skill after discussing what to build, whenever the outcome should be written into Plane — triggers on 'record this into Plane', 'create issues for this', 'plan out this feature', 'write the acceptance criteria for this module'. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for reading an existing plan back or deciding what to work on next (use pick-up-work instead)."
 ---
 
-# 把设计讨论落成 Plane 里的任务图
+# Record a Design Discussion as a Task Graph in Plane
 
-目标不是"把想法存下来"，而是**存成下次能原样读回、不需要重新解读的结构**。归属走 Module、先后走 relation、状态走 state——一律用结构化字段，**不许只写在 description 里**。写在正文的规划，下次读回来会被重新解读一遍，而且解读得不一样。
+The goal is not "save the idea" but **save it in a structure that can be read back as-is next time, with no reinterpretation**. Ownership goes through Module, ordering through relations, status through state — always structured fields, **never only in the description**. A plan written into body text gets reinterpreted on the next read, and reinterpreted differently.
 
-## 映射
+## Mapping
 
-| Plane 概念 | 装什么 |
+| Plane concept | What it holds |
 |---|---|
-| Project | 一个代码仓库 |
-| Module | 一个 feature——用户能用一句话说"帮我实现 xxx"的那个 xxx |
-| Work item | 一次能坐下来做完、能单独 review 的改动 |
-| 验收 item | 每个 module 恰好一个，装"整个 module 做到什么程度算完"（见下） |
+| Project | One code repository |
+| Module | One feature — the xxx in "implement xxx for me" that the user can say in one sentence |
+| Work item | One change that can be finished in a single sitting and reviewed on its own |
+| Acceptance item | Exactly one per module, holding "how far the whole module must go to count as done" (see below) |
 
-Cycle 和 Label 不用：Cycle 是时间维度（sprint），这套流程里没有；Label 目前没有它才能表达的东西。
+Cycle and Label are not used: Cycle is a time dimension (sprint), which this workflow does not have; Label currently has nothing that only it can express.
 
-Module、Label、Cycle、Estimate 都是 **project-scoped**，不能跟着 work item 跨 project。一个 feature 横跨两个仓库时，只能两边各建一个 Module，用跨 project 的 `workitem_relation` 把具体的 item 连起来。
+Module, Label, Cycle, and Estimate are all **project-scoped** and cannot follow a work item across projects. When a feature spans two repositories, the only option is one Module on each side, with the specific items linked by a cross-project `workitem_relation`.
 
-## 前置：确认 project，并确保 Modules 功能是开的
+## Prerequisite: Confirm the Project and Make Sure Modules Is Enabled
 
-先 `project(action="list")` 找目标 project。**没有对应 project 时停下来问用户**，不要自作主张新建。
+First run `project(action="list")` to find the target project. **If no matching project exists, stop and ask the user** — do not create one on your own initiative.
 
-新建的 project **默认 `module_view: false`，Modules 功能是关的**，不先打开的话建 Module 那步会直接失败：
+A new project **defaults to `module_view: false`, with Modules disabled**; unless you enable it first, the Module creation step fails outright:
 
 ```
 project(action="update_features", project_id=..., modules=true)
 ```
 
-对已有 project 也先确认一次（`project(action="get_features")`），不要假设开着。
+For an existing project, confirm it once as well (`project(action="get_features")`) — do not assume it is on.
 
-## 写入顺序（第 4 步是独立一步，必做）
+## Write Order (Step 4 Is a Separate Step and Mandatory)
 
-1. `module(action="create")` —— 建 feature
-2. `workitem(action="create")` —— 逐个建 item，**外加一个验收 item**
-3. `module(action="manage_workitems")` —— 把 item 挂进 module（验收 item 也要挂）
-4. `workitem_relation(action="create")` —— **连依赖**，含验收 item 的 `blocked_by`
+1. `module(action="create")` — create the feature
+2. `workitem(action="create")` — create the items one by one, **plus one acceptance item**
+3. `module(action="manage_workitems")` — attach the items to the module (the acceptance item too)
+4. `workitem_relation(action="create")` — **wire up dependencies**, including the acceptance item's `blocked_by`
 
-第 4 步不能省，也不能提前：relation 要用 item 的 ID，只有 item 全部建完才拿得到。**item 建完就向用户报告"好了"是不合格的**——那时依赖还一条都没有，图是散的，读回时每个 item 都会被判定成可开工。
+Step 4 can be neither skipped nor moved earlier: relations need item IDs, which exist only once all items are created. **Reporting "done" to the user as soon as the items are created is a failure** — at that point there is not a single dependency, the graph is disconnected, and on read-back every item will be judged ready to start.
 
-## 依赖：只用 `blocked_by`，从被阻塞方发起
+## Dependencies: Use Only `blocked_by`, Created From the Blocked Side
 
-内置 relation type 只有 6 个：`blocking` / `blocked_by` / `start_before` / `start_after` / `finish_before` / `finish_after`。后四个是甘特图排期用的，跟"能不能开工"无关，**不用**。
+There are only 6 built-in relation types: `blocking` / `blocked_by` / `start_before` / `start_after` / `finish_before` / `finish_after`. The last four are for Gantt-chart scheduling and have nothing to do with "can this start"; **do not use them**.
 
-**永远从被阻塞的那个 item 发起 `blocked_by`**，指向阻塞它的 item。这样"我被谁挡着"这条信息就长在需要它的那个 item 上。
+**Always create `blocked_by` from the blocked item**, pointing at the item that blocks it. That way the fact "who is blocking me" lives on the item that needs it.
 
-Plane **双向存储**：从 A 发起 `blocked_by B` 之后，读 B 会看到 `blocking: [A]`。所以不需要自己维护反向边，也不要重复建一条反向的 `blocking` 关系。
+Plane **stores relations bidirectionally**: after A creates `blocked_by B`, reading B shows `blocking: [A]`. So there is no need to maintain the reverse edge yourself, and do not create a duplicate reverse `blocking` relation.
 
-**"相关但不阻塞"是自定义关系，不是内置类型。** 它走 `relation_definition_id` + `relation_definition_label`，label 是 `"relates to"`（**带空格**，不是 `relates_to`）。workspace 默认自带这条定义，用之前先 `workitem_relation(action="list_definitions")` 拿 id。
+**"Related but not blocking" is a custom relation, not a built-in type.** It goes through `relation_definition_id` + `relation_definition_label`, with label `"relates to"` (**with a space**, not `relates_to`). The workspace ships with this definition by default; run `workitem_relation(action="list_definitions")` to get its id before using it.
 
-## 依赖记在 work item 之间，不记在模块之间
+## Record Dependencies Between Work Items, Not Between Modules
 
-「支付依赖登录」这种模块级说法通常是假的——真相往往是"支付里读用户信息那个 item 依赖登录里签发 session 那个 item"，支付模块其余的活（UI、对账、退款）跟登录无关。记成模块级依赖，整个模块会被判定为阻塞中，**本可并行的活被误判成不能并行**，恰好毁掉这套方案要的能力。
+A module-level statement like "payments depends on login" is usually false — the truth is often "the item in payments that reads user info depends on the item in login that issues the session", while the rest of the payments module (UI, reconciliation, refunds) has nothing to do with login. Record it as a module-level dependency and the whole module is judged blocked; **work that could run in parallel is misjudged as unable to**, which destroys exactly the capability this approach exists for.
 
-如果出现"整个模块 B 必须等 A"、但说不出具体是哪两个 item——说明这个依赖还没想清楚，**停下来问用户**，不要记一条糊的进去。
+If it comes up that "all of module B must wait for A" but no one can name the specific two items, the dependency has not been thought through yet: **stop and ask the user** — do not record a vague one.
 
-## 每个 module 一个验收 item
+## One Acceptance Item per Module
 
-**每个 module 都要有一个、且只有一个验收 item**，装两件事：整个 module 做到什么程度算完，以及哪些测试必须通过。
+**Every module must have one, and only one, acceptance item**, holding two things: how far the whole module must go to count as done, and which tests must pass.
 
-它跟别的 item 一样是 work item，所以自带 state、评论、附件。于是：
+Like any other item it is a work item, so it comes with state, comments, and attachments. Therefore:
 
-- **state 就是"这个 module 验收过了没有"**——不需要另找地方记，也不会出现两份说法打架。
-- 每次跑验收的结果记成**评论**，不要改 description。description 是标准（相对稳定），评论是历史（每次都不同）。混在一起，下次读的人分不出哪句是要求、哪句是上回的结果。
+- **Its state is "has this module passed acceptance"** — no other place is needed to record it, and two conflicting accounts cannot arise.
+- Record each acceptance run's result as a **comment**; do not edit the description. The description is the standard (relatively stable); comments are the history (different every time). Mix them and the next reader cannot tell which sentence is a requirement and which is last time's result.
 
-**为什么不写在 module 的 description 里**：module 描述经公开 API 只能存纯文本(`description`)，没有 `description_html`；更要命的是 module 没有 state、没有评论、没有附件。验收结论无处可放，只能变成一句谁也不会更新的散文。
+**Why not in the module's description**: through the public API a module description can only store plain text (`description`), with no `description_html`; worse, a module has no state, no comments, and no attachments. The acceptance verdict has nowhere to go and can only become a sentence of prose that nobody ever updates.
 
-### 建法
+### How to Create It
 
-标题固定为 `<module 名> 验收`。`pick-up-work` 靠这个后缀认出它，**别改这个后缀**——改了它就退化成一个普通 item，验收流程不会被触发，但表面上一切正常。
+The title is fixed as `<module name> 验收`. `pick-up-work` recognizes it by this suffix; **do not change the suffix** — change it and the item degrades into an ordinary item, the acceptance flow never triggers, yet everything looks normal on the surface.
 
-`description_html` 用这个模板：
+Use this template for `description_html`:
 
 ```html
-<p><strong>完成定义</strong>：整个 module 达到什么状态算做完</p>
+<p><strong>完成定义</strong>: what state the whole module must reach to count as done</p>
 <p><strong>必须通过的测试</strong></p>
 <ul>
-  <li>具体的测试/命令 —— 覆盖哪个行为</li>
+  <li>A specific test/command — which behavior it covers</li>
 </ul>
 <p><strong>手动验证</strong></p>
 <ul>
-  <li>自动化测不到、必须人工确认的那几条</li>
+  <li>The few checks automation cannot reach and a human must confirm</li>
 </ul>
 ```
 
-**「必须通过的测试」要写到能直接执行**——具体的测试文件名、测试函数名，或者能照抄进终端的命令。写"单元测试通过"等于没写：下次读的人不知道是哪些测试，也就没法判断跑完的那批够不够。
+**Write "必须通过的测试" so it can be executed directly** — specific test file names, test function names, or commands that can be pasted into a terminal as-is. Writing "unit tests pass" is the same as writing nothing: the next reader does not know which tests, and so cannot judge whether the batch that ran is enough.
 
-**只写这个 module 引入的验收**，不要把全仓库的测试套件抄进来。它是"这个 module 带来了什么新保证"，不是回归清单。
+**Write only the acceptance this module introduces**; do not copy the whole repository's test suite in. It is "what new guarantees this module brings", not a regression checklist.
 
-「手动验证」没有内容就整段删掉。
+If "手动验证" has no content, delete the whole section.
 
-### 依赖：验收 item `blocked_by` 该 module 的每一个其他 item
+### Dependencies: The Acceptance Item Is `blocked_by` Every Other Item in the Module
 
-这是 module 里唯一一条机械规则的依赖——**扇入所有其他 item**。作用是让它在 `pick-up-work` 里自然排到最后：只要还有一件活没做完，它就是被挡住的；全做完了，它自己浮上来成为可开工项，提醒你去验收。
+This is the only mechanically determined dependency in a module — **fan in from all other items**. Its effect is that it naturally sorts last in `pick-up-work`: as long as any piece of work is unfinished, it is blocked; once everything is done, it surfaces on its own as ready to start, reminding you to run acceptance.
 
-不要反过来让别的 item 依赖它。
+Do not reverse it by making other items depend on it.
 
-### 什么时候不建
+### When Not to Create It
 
-单个 item 就能做完的 module，验收 item 是纯冗余——那个 item 自己的「完成标准」已经是全部。这种情况下**这个 module 大概也不该存在**，直接建一个 work item 就好。
+For a module that a single item can finish, the acceptance item is pure redundancy — that item's own "完成标准" is already everything. In that case **the module probably should not exist either**; just create one work item.
 
-## 不要记录"哪些可以并行"
+## Do Not Record "Which Ones Can Run in Parallel"
 
-并行是依赖图的推论，不是一条独立事实。一旦后来加了新依赖，存下来的"这几个可并行"就悄悄变成错的，但它长得跟对的一模一样。只要依赖记准，可并行集合任何时候都能算出来（见 `pick-up-work`）。
+Parallelism is an inference from the dependency graph, not an independent fact. Once a new dependency is added later, a stored "these can run in parallel" silently becomes wrong, yet it looks exactly like a correct one. As long as dependencies are recorded accurately, the parallel set can be computed at any time (see `pick-up-work`).
 
-## description 模板
+## Description Templates
 
-**不写**：属于哪个 feature（Module 管）、依赖谁（relation 管）、什么状态（state 管）。这三样一旦在正文里出现第二份，就会跟字段对不上，而对不上的时候没人知道哪份是真的。
+The section labels in these templates and in the acceptance-item template above, plus the acceptance-item title suffix `验收`, are literal strings written into Plane, and they stay in Chinese on purpose: people read them in the Plane UI, and `pick-up-work` matches them verbatim on read-back. Translating them would make items already in Plane go unrecognized.
 
-### Work item（`description_html`）
+**Do not write**: which feature it belongs to (Module handles that), what it depends on (relations handle that), what status it is in (state handles that). Once any of these three appears a second time in the body, it will drift from the field, and when they disagree nobody knows which one is true.
+
+### Work Item (`description_html`)
 
 ```html
-<p><strong>为什么</strong>：这个改动要解决什么问题</p>
-<p><strong>完成标准</strong>：满足什么条件算做完</p>
-<p><strong>注意</strong>：已知的坑、约束、已经拍板的决策</p>
+<p><strong>为什么</strong>: what problem this change solves</p>
+<p><strong>完成标准</strong>: what conditions must hold for it to count as done</p>
+<p><strong>注意</strong>: known pitfalls, constraints, decisions already made</p>
 ```
 
-**「完成标准」不许省。** 它是三段里唯一不会自然写出来的——"为什么"跟着讨论就有了，"注意"没有就是没有，但验收标准如果不留固定位置，写着写着就只剩一段背景描述。下次读回时无从判断这个 item 到底做完没有。
+**"完成标准" must not be omitted.** It is the only one of the three sections that does not get written naturally — "为什么" comes with the discussion, "注意" either exists or it does not, but if acceptance criteria have no fixed slot, the writing drifts until only a paragraph of background is left. On the next read-back there is no way to judge whether the item is actually done.
 
-写不出完成标准，通常说明这个 item 还没想清楚，或者切得太大。**停下来问用户，不要用一句"实现 xxx"糊过去。**
+Being unable to write completion criteria usually means the item has not been thought through yet, or is cut too large. **Stop and ask the user; do not paper over it with a single "implement xxx".**
 
-「注意」段没有内容就整段删掉，不要留空壳。
+If the "注意" section has no content, delete the whole section — do not leave an empty shell.
 
-### Module（description，纯文本）
+### Module (description, plain text)
 
 ```
-目标：这个 feature 要达成什么
-不包含：明确划到范围外的东西
+目标：what this feature must achieve
+不包含：things explicitly placed outside the scope
 ```
 
-「不包含」这段是防边界漂移的。feature 做着做着长出计划外的 item，是这套流程最常见的失控方式；把范围外的东西写下来，后面再冒出相关想法时能立刻看出它是新 feature 还是本来就该做的。
+The "不包含" section guards against boundary drift. A feature sprouting unplanned items as work goes on is the most common way this workflow gets out of control; with out-of-scope things written down, when a related idea pops up later you can tell immediately whether it is a new feature or something that was meant to be done all along.
 
-⚠️ **module 的 description 只能是纯文本，不要塞 HTML。** 数据库里 Module 确实有 `description_html`，但公开 API 的 create/update serializer 白名单里没有它——只收 `name` / `description` / `start_date` / `target_date` / `status` / `lead` / `members` / `external_source` / `external_id`。传 HTML 标签会被当字面文本存下来。
+⚠️ **A module's description can only be plain text; do not stuff HTML into it.** The Module does have `description_html` in the database, but it is not on the public API's create/update serializer allowlist — which accepts only `name` / `description` / `start_date` / `target_date` / `status` / `lead` / `members` / `external_source` / `external_id`. HTML tags passed in are stored as literal text.
 
-**验收标准不写在这里**——module 没有 state 也没有评论，装不下"验收过了没有"。它归验收 item。
+**Acceptance criteria do not go here** — a module has no state and no comments, so it cannot hold "has it passed acceptance". They belong to the acceptance item.
 
-### 格式约束
+### Format Constraints
 
-`description_html` **只接受裸 HTML**，传 `&lt;p&gt;` 这类转义实体会被原样存下、在 UI 里显示成字面标签，而接口照样返回 200。
+`description_html` **accepts only raw HTML**; escaped entities such as `&lt;p&gt;` are stored verbatim and shown as literal tags in the UI, while the API still returns 200.
 
-只用 `<p>` / `<strong>` / `<ul>` / `<li>` 这几个基础标签。Plane 编辑器对更复杂标签的支持范围没有验证过，不要用。
+Use only these basic tags: `<p>` / `<strong>` / `<ul>` / `<li>`. How far the Plane editor supports more complex tags has not been verified; do not use them.
 
-## 两个静默失败（返回 200，数据是错的）
+## Two Silent Failures (Returns 200, Data Is Wrong)
 
-**`description_html` 要裸 HTML，不能传转义实体。** 传 `&lt;p&gt;` 会被原样存下，UI 里显示成字面标签，接口照样返回成功。写 `<p>…</p>`。
+**`description_html` needs raw HTML, not escaped entities.** Passing `&lt;p&gt;` stores it verbatim, the UI shows literal tags, and the API still returns success. Write `<p>…</p>`.
 
-**不要信 `workitem(action="create")` / `workitem(action="update")` 返回里的 `state_group`。** create 返回 `null`，update 返回的是**改之前的旧值**。要确认状态，重新走 `list` 系列接口。
+**Do not trust the `state_group` returned by `workitem(action="create")` / `workitem(action="update")`.** create returns `null`, and update returns **the old value from before the change**. To confirm state, go back through the `list` family of endpoints.
 
-## 收尾
+## Wrap-Up
 
-把建好的结构报告给用户：module 名、每个 item 的标识符（如 `ABC-1`）和标题、以及**每一条 relation**。relation 要单独列出来——用户能一眼看出依赖图对不对，是这套流程唯一的人工校验点。
+Report the created structure to the user: the module name, each item's identifier (e.g. `ABC-1`) and title, and **every relation**. List relations separately — the user being able to see at a glance whether the dependency graph is right is the only human checkpoint in this workflow.
 
-验收 item 单独列出来，**连同它「必须通过的测试」那几条一起**。用户最可能要改的就是这几条——补一个漏掉的测试，或者砍掉一条其实没必要的。
+List the acceptance item separately, **together with its "必须通过的测试" entries**. Those entries are what the user is most likely to change — adding a missed test, or cutting one that is not actually needed.
 
-不要顺带断言"这几个可以并行"。要算就走 `pick-up-work` 的流程真算一遍，**不要肉眼判断**——多阻塞者的 item 正是人最容易看漏的地方。
+Do not casually assert "these can run in parallel" along the way. To compute it, actually run through the `pick-up-work` flow; **do not judge by eye** — items with multiple blockers are exactly where people most easily miss things.

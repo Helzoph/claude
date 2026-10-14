@@ -3,15 +3,15 @@ name: pick-up-work
 description: "Read a feature's task graph back from Plane and compute which work items can start right now, by checking whether each item's blocked_by dependencies are all done; when the unblocked item is a Module's acceptance item, run its listed tests and record the outcome. Use this skill when picking up work on a feature already recorded in Plane — triggers on 'implement the xxx feature', 'what can I work on next', 'what's unblocked', 'is this module done'. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane instead)."
 ---
 
-# 从 Plane 读回任务图，算出现在能开工的
+# Read the Task Graph Back From Plane and Compute What Can Start Now
 
-**可并行集合永远是算出来的，不是存下来的**，也不能靠肉眼看依赖图判断——多阻塞者的 item 是人最容易看漏的地方。
+**The parallel set is always computed, never stored**, and it cannot be judged by eyeballing the dependency graph — items with multiple blockers are where people most easily miss things.
 
-定义：**未完成、且所有 `blocked_by` 指向的 item 都已完成** 的那批 item。
+Definition: the items that are **not done, and whose every `blocked_by` target is done**.
 
-## 读回流程
+## Read-Back Flow
 
-### 1. 拉未完成的 item（1 次调用）
+### 1. Fetch Unfinished Items (1 Call)
 
 ```
 workitem(action="list", project_id=...,
@@ -19,89 +19,89 @@ workitem(action="list", project_id=...,
   fields='id,sequence_id,name,state_group')
 ```
 
-PQL 把"列出全部"和"排除已完成"合成一次调用，返回的就是候选集。
+PQL merges "list everything" and "exclude finished" into one call; what comes back is the candidate set.
 
-`fields` 一定要带。不裁剪的话每个 item 都带着完整 description，几千字；裁成这四个字段只有几行。
+Always pass `fields`. Without trimming, every item carries its full description, thousands of characters; trimmed to these four fields it is a few lines.
 
-### 2. 逐个拉依赖（M 次调用，M = 上一步返回的条数）
+### 2. Fetch Dependencies One by One (M Calls, M = Number of Results From the Previous Step)
 
 ```
 workitem_relation(action="list", workitem_id=...)
 ```
 
-**依赖无法批量取**——`expand=issue_relation` 不工作，返回里没有关系字段。这是硬下限：M 个未完成 item 就是 M 次调用。20 个 item 的 module 读一次要 20 次左右调用，会花不少时间。
+**Dependencies cannot be fetched in bulk** — `expand=issue_relation` does not work; the response has no relation fields. This is a hard floor: M unfinished items means M calls. A module with 20 items takes about 20 calls per read, which takes a while.
 
-如果某个 module 的 item 多到读一次明显吃力，那不是要去优化读法，是这个 module 该拆了——用户也没法用一句"帮我实现 xxx"指挥一个几十件事的模块。
+If a module has so many items that one read is clearly a strain, the fix is not to optimize the read but to split the module — the user cannot direct a module of dozens of tasks with a single "implement xxx for me" either.
 
-### 3. 只读 `dependencies.blocked_by`
+### 3. Read Only `dependencies.blocked_by`
 
-返回结构是两个桶：
+The response has two buckets:
 
 ```
 { dependencies: { blocking: [...], blocked_by: [...], start_before: [...], ... },
   custom:       { "relates to": [...], duplicate: [...], ... } }
 ```
 
-**只读 `dependencies.blocked_by`，其余一律忽略——这是白名单，不是黑名单。**
+**Read only `dependencies.blocked_by` and ignore everything else — this is an allowlist, not a denylist.**
 
-- `custom` 桶装的是自定义关系，label 可以任意取。写成黑名单（"排除 relates to，剩下的当阻塞"）的话，以后任何人新建一条自定义关系定义都会被静默当成阻塞，整个计算作废且不报错。
-- **`blocking` 桶绝不能算进去**。它是 Plane 自动生成的反向边——A `blocked_by` B 之后，B 那边会出现 `blocking: [A]`。把它当依赖，方向就整个反过来了。
+- The `custom` bucket holds custom relations, whose labels can be anything. Written as a denylist ("exclude relates to, treat the rest as blocking"), any custom relation definition anyone creates later is silently treated as blocking, and the whole computation becomes invalid without any error.
+- **The `blocking` bucket must never be counted.** It is the reverse edge Plane generates automatically — after A `blocked_by` B, B shows `blocking: [A]`. Treat it as a dependency and the direction is reversed entirely.
 
-### 4. 判断阻塞者是否已完成
+### 4. Determine Whether Each Blocker Is Done
 
-第 1 步已经把已完成的 item 过滤掉了，所以：**`blocked_by` 里的 id 不在第 1 步结果中 → 该阻塞者已完成**。不用再单独查它的状态。
+Step 1 already filtered out finished items, so: **an id in `blocked_by` that is not in step 1's results → that blocker is done**. No separate lookup of its state is needed.
 
-⚠️ **不要信 `blocked_by` 条目里自带的 state 字段**，按"在不在候选集里"来判断。
+⚠️ **Do not trust the state field carried in a `blocked_by` entry**; judge by "is it in the candidate set".
 
-### 5. 得出结果
+### 5. Derive the Result
 
-`blocked_by` 全部已完成（或本来就没有 `blocked_by`）的 item = 现在可并行开工的。
+Items whose `blocked_by` entries are all done (or that have no `blocked_by` at all) = the items that can start in parallel now.
 
-**多条 `blocked_by` 是 AND**：全部完成才解锁，差一条都不行。
+**Multiple `blocked_by` entries are AND**: all must be done to unlock; missing even one is not enough.
 
-### 6. 开工前置状态
+### 6. Set State Before Starting
 
 ```
-workitem(action="update", workitem_id=..., state=<started 组某个 state 的 UUID>)
+workitem(action="update", workitem_id=..., state=<UUID of a state in the started group>)
 ```
 
-先 `state(action="list")` 拿到该 project 里 group 为 `started` 的 state UUID。
+First run `state(action="list")` to get the UUID of a state whose group is `started` in that project.
 
-⚠️ **`update` 的返回里 `state_group` 是陈旧的**——改成 Done 之后，返回里 `state` 和 `completed_at` 都更新了，但 `state_group` 仍是旧值。要复核就重新 `list`。信了它，刚完成的 item 会被当成未完成，**下次算并行集合会少算**。
+⚠️ **The `state_group` in `update`'s response is stale** — after changing to Done, the response's `state` and `completed_at` are updated but `state_group` is still the old value. To double-check, `list` again. Trust it and a just-finished item is treated as unfinished, **so the next parallel-set computation comes up short**.
 
-## 判断完成一律看 state 的 group，不看状态名
+## Judge Completion by State Group, Never by State Name
 
-group 固定为五个：`backlog` / `unstarted` / `started` / `completed` / `cancelled`。**状态名字可以随便改，group 改不了**，所以判断只能基于 group。
+There are exactly five groups: `backlog` / `unstarted` / `started` / `completed` / `cancelled`. **State names can be changed freely; groups cannot**, so judgments can only be based on the group.
 
-**新建的 item 默认落在 `backlog`**，不是 `unstarted`。所以 `backlog` 不代表"还没进入计划"——排除时只排除 `completed` 和 `cancelled`，别把 `backlog` 也排掉。
+**New items land in `backlog` by default**, not `unstarted`. So `backlog` does not mean "not yet in the plan" — when excluding, exclude only `completed` and `cancelled`; do not exclude `backlog` as well.
 
-## 真正开始做之前：确认这个 item 有完成标准
+## Before Actually Starting: Confirm the Item Has Completion Criteria
 
-选定要做的 item 之后，读它的 description（第 1 步为省 token 裁掉了 description，这里单独 `workitem(action="retrieve")` 拿一次）。
+After choosing the item to work on, read its description (step 1 trimmed the description to save tokens, so fetch it once here with `workitem(action="retrieve")`).
 
-description 里应该有 `完成标准` 这一段（见 `plan-to-plane` 的模板）。**没有的话停下来问用户**，不要凭标题推断什么算做完。
+The description should contain a `完成标准` section (see the template in `plan-to-plane`). **If it does not, stop and ask the user** — do not infer from the title what counts as done.
 
-⚠️ **验收 item 是例外**：它的模板里是「完成定义」+「必须通过的测试」，没有「完成标准」。别把它当成缺模板——先按下一节认出它，再走那边的流程。
+⚠️ **The acceptance item is the exception**: its template has "完成定义" + "必须通过的测试", not "完成标准". Do not treat it as missing the template — first recognize it per the next section, then follow that flow.
 
-原因：标题只说了要做什么，没说做到哪儿算完。凭标题猜的验收标准和用户心里的那个不一致时，你会在自认为完成的地方停下，而用户拿到的是个半成品——**而且双方都不知道错在哪一步**。
+Reason: the title says only what to do, not how far to go to be done. When acceptance criteria guessed from the title differ from the one in the user's head, you stop where you think you are done, and the user gets a half-finished product — **and neither side knows which step went wrong**.
 
-老 item 缺这一段是正常的（模板是后来才有的）。补一句问清楚，顺手 `workitem(action="update")` 把它补进 description，下次就不用再问。
+Old items missing this section is normal (the template came later). Ask one question to clarify, and while at it run `workitem(action="update")` to add it to the description, so it need not be asked again next time.
 
-## 浮上来的是验收 item（`<module 名> 验收`）时
+## When the Item That Surfaces Is the Acceptance Item (`<module name> 验收`)
 
-它 `blocked_by` 整个 module 的所有其他 item，所以它变成可开工 **= 这个 module 的活全干完了**，该验收了。
+It is `blocked_by` every other item in the module, so it becoming ready to start **= all work in this module is done**, and acceptance is due.
 
-这时不要写代码。读它的 description，**逐条跑「必须通过的测试」里列的命令**，一条都不许跳过或换成"看起来等价"的。
+Do not write code at this point. Read its description and **run every command listed under "必须通过的测试", one by one**; not a single one may be skipped or replaced with something that "looks equivalent".
 
-- **全过** → 记一条评论（`workitem_comment(action="create", comment_html=...)`，字段是 HTML，不是纯文本）：跑了哪些、各自什么结果。然后把 state 改成 completed 组。
-- **有挂的** → **不要**把验收 item 改成完成。挂掉的那条说明 module 还没做完：把失败内容记成评论，然后跟用户确认是去修某个已有 item，还是这里少了一个 item。
+- **All pass** → record a comment (`workitem_comment(action="create", comment_html=...)`; the field is HTML, not plain text): which ones ran and what each returned. Then change the state to the completed group.
+- **Some fail** → **do not** mark the acceptance item done. A failure means the module is not finished: record the failure as a comment, then confirm with the user whether to fix an existing item or whether an item is missing here.
 
-评论记结果、description 记标准，**两者不要混**。跑挂了就去改 description 里的验收标准，是把尺子改短来适应结果——下次读的人无从知道标准被改过。
+Comments record results, the description records the standard; **do not mix the two**. Editing the acceptance criteria in the description after a failure is shortening the ruler to fit the result — the next reader has no way of knowing the standard was changed.
 
-description 里没有「必须通过的测试」这一段（老 module，或验收 item 是后补的）→ **停下来问用户**，不要自己挑几个测试跑跑就算验收过了。
+If the description has no "必须通过的测试" section (an old module, or the acceptance item was added later) → **stop and ask the user**; do not pick a few tests yourself, run them, and call acceptance passed.
 
-## 报告给用户
+## Report to the User
 
-列出可并行开工的那批（标识符 + 标题），以及**被挡住的那些各自在等谁**。后者同样重要——用户看到"等着的是什么"，才能判断要不要调整优先级。
+List the batch that can start in parallel (identifier + title), and **what each blocked item is waiting on**. The latter matters just as much — only by seeing "what is being waited on" can the user judge whether to adjust priorities.
 
-依赖变化后（做完一个、或加了新依赖），**重新算一遍**，不要沿用上一次的结果。
+After dependencies change (one item finished, or a new dependency added), **recompute** — do not reuse the previous result.

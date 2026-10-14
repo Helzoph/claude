@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
-# 正式环境护栏。文字约束(CLAUDE.md 之类)靠 agent 自觉,这一道不靠。
+# Prod guard. Written rules (CLAUDE.md and the like) rely on the agent's self-discipline; this one does not.
 #
-# ── 判据是目录名,不是分支名,也不是环境变量 ────────────────────────────────
-# 分支能被 checkout 改掉,目录不会。而且 Docker Compose 的项目名默认就取目录名,
-# 容器名和卷名都带这个前缀——目录名已经是「这条命令会动到哪一套数据」的事实
-# 判据。再引入第二种判据(ENV=prod、分支名)就会出现「一处说这是 UAT、一处说是
-# 正式」的状态,而这类不一致恰好在最危险的那一刻才暴露。
+# ── The criterion is the directory name, not the branch name, not an env var ──
+# A checkout can change the branch, but not the directory. And Docker Compose
+# derives the project name from the directory name by default, so container and
+# volume names carry that prefix — the directory name is already the factual
+# criterion for "which data set this command will touch". Introducing a second
+# criterion (ENV=prod, branch name) creates states where "one place says this is
+# UAT and another says prod", and this kind of inconsistency surfaces exactly at
+# the most dangerous moment.
 #
-# ── 只拦不可逆、且没有 undo 的操作 ────────────────────────────────────────
-# 拦得越多,被整体关掉的可能越大。所以这里只有三条硬拦截 + 一条软确认,不追求
-# 全面防护。换个写法(`docker rm -v`、手删 /var/lib/docker/volumes/)照样绕得
-# 过去——真正的兜底仍然是「不在正式环境目录里做试验」。
+# ── Only block operations that are irreversible and have no undo ──────────────
+# The more it blocks, the more likely it gets switched off entirely. So there are
+# only three hard blocks + one soft confirmation here; comprehensive protection
+# is not the goal. A different phrasing (`docker rm -v`, deleting
+# /var/lib/docker/volumes/ by hand) still gets around it — the real backstop is
+# still "do not experiment in the prod directory".
 #
-# 占位符由 env-tiers/setup-tiers skill 填写:
-#   __PROD_DIR__      正式环境的目录名(目录名,不是路径)
-#   __DATA_VOLUME__   compose 里声明的卷名;实际卷名是 <PROD_DIR>_<DATA_VOLUME>
-#   __PROD_OVERRIDE__ 正式环境必须带上的 compose override 文件名
-#   __UAT_DIR__       UAT 的目录名,只出现在提示文案里
+# Placeholders are filled in by the env-tiers/setup-tiers skill:
+#   __PROD_DIR__      the prod directory name (directory name, not a path)
+#   __DATA_VOLUME__   the volume name declared in compose; the actual volume name is <PROD_DIR>_<DATA_VOLUME>
+#   __PROD_OVERRIDE__ the compose override file name prod must always include
+#   __UAT_DIR__       the UAT directory name, used only in message text
 set -uo pipefail
 
 PROD_DIR="__PROD_DIR__"
@@ -28,71 +33,81 @@ FULL_VOLUME="${PROD_DIR}_${DATA_VOLUME}"
 
 INPUT=$(cat)
 
-# python3 不在时两个变量都是空,下面 CMD 为空即放行——fail-open 是刻意的:
-# 一道解析不出输入的护栏如果改成 fail-closed,会把这个项目里所有 Bash 调用
-# 全堵死,结果必然是有人直接把 hook 关掉,连那三条硬拦截一起失去。
+# Without python3 both variables are empty, and an empty CMD below means allow —
+# fail-open is deliberate: if a guard that cannot parse its input were made
+# fail-closed, it would block every Bash call in this project, and the inevitable
+# result is someone switching the hook off outright, losing the three hard blocks
+# along with it.
 CWD=$(printf '%s' "$INPUT" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("cwd",""))' 2>/dev/null || echo "")
 CMD=$(printf '%s' "$INPUT" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' 2>/dev/null || echo "")
 
 [ -z "$CMD" ] && exit 0
 
-# ── 这条命令是不是打在正式环境上 ──────────────────────────────────────────
+# ── Is this command aimed at prod ─────────────────────────────────────────────
 #
-# 主判据:session 的目录名等于 PROD_DIR。worktree 的目录名各不相同,天然被排除,
-# 不需要额外的路径前缀例外。
+# Primary criterion: the session's directory name equals PROD_DIR. Worktree
+# directory names all differ, so they are excluded by construction, with no need
+# for an extra path-prefix exception.
 #
-# 补充判据:hook 拿到的 cwd 是 session 的工作目录,不是命令实际执行的目录。
-# `cd ../<PROD_DIR> && docker compose down -v` 会带着一个无害的 cwd 通过主判据。
-# 所以命令文本里出现 `cd` 到该目录时同样按正式环境处理。代价是偶尔误伤(例如在
-# UAT 里 `cd ../<PROD_DIR> && git log`),而误伤只是多挨一次拦截,方向是安全的。
+# Secondary criterion: the cwd the hook receives is the session's working
+# directory, not the directory where the command actually runs.
+# `cd ../<PROD_DIR> && docker compose down -v` would pass the primary criterion
+# with a harmless cwd. So when the command text contains a `cd` into that
+# directory, it is treated as prod as well. The cost is an occasional false
+# positive (e.g. `cd ../<PROD_DIR> && git log` in UAT), and a false positive just
+# costs one extra block, so the direction is safe.
 in_prod=0
 [ "$(basename "$CWD")" = "$PROD_DIR" ] && in_prod=1
 printf '%s' "$CMD" | grep -qE "\bcd[[:space:]]+[^[:space:];&|]*/?${PROD_DIR}(/|[[:space:]]|$)" && in_prod=1
 
 [ "$in_prod" -eq 0 ] && exit 0
 
-# ── 硬拦截:会清掉真实数据且没有 undo ─────────────────────────────────────
+# ── Hard blocks: would wipe real data, with no undo ───────────────────────────
 
-# compose down 带 -v/--volumes
+# compose down with -v/--volumes
 if printf '%s' "$CMD" | grep -qE 'docker[[:space:]]+compose\b' \
    && printf '%s' "$CMD" | grep -qE '\bdown\b' \
    && printf '%s' "$CMD" | grep -qE '(^|[[:space:]])(-v|--volumes)([[:space:]]|$)'; then
   cat >&2 <<MSG
-拦下了:这里是正式环境目录,\`down -v\` 会删掉 ${FULL_VOLUME}——真实数据。
-恢复只能退回上一次备份,那之间的写入没有别处可取。
+Blocked: this is the prod directory, and \`down -v\` would delete ${FULL_VOLUME} — real data.
+Recovery can only roll back to the last backup; writes since then cannot be recovered from anywhere else.
 
-要重启正式环境用:
+To restart prod, use:
   just up
-要清空数据做试验,去 ${UAT_DIR}/。
+To wipe data for an experiment, go to ${UAT_DIR}/.
 MSG
   exit 2
 fi
 
-# 直接删/清卷。prune 不带项目名,会把这台机器上所有未使用的卷一起带走。
+# Deleting/pruning volumes directly. prune does not take a project name and takes
+# every unused volume on this machine with it.
 if printf '%s' "$CMD" | grep -qE 'docker[[:space:]]+volume[[:space:]]+(rm|prune)'; then
   cat >&2 <<MSG
-拦下了:${FULL_VOLUME} 是正式环境的真实数据,删掉只能退回上一次备份。
-确实要删就自己在终端执行,不要经 agent。
+Blocked: ${FULL_VOLUME} is prod's real data; deleting it means rolling back to the last backup.
+If you really need to delete it, run it yourself in a terminal, not through the agent.
 MSG
   exit 2
 fi
 
-# git clean -x 会把被 gitignore 的文件一起删——凭证文件和本地备份目录通常正好
-# 都被 gitignore,于是在 clean 眼里它们是「无主文件」,而它们恰恰最不能丢。
+# git clean -x deletes gitignored files too — credential files and local backup
+# directories are usually exactly the gitignored ones, so in clean's eyes they are
+# "unowned files", yet they are precisely what can least be lost.
 if printf '%s' "$CMD" | grep -qE '\bgit[[:space:]]+clean\b' \
    && printf '%s' "$CMD" | grep -qE '[[:space:]]-[a-zA-Z]*[xX]'; then
   cat >&2 <<'MSG'
-拦下了:`git clean -x` 会删掉被 gitignore 的文件——凭证和本地数据库快照通常都在
-这一类里,它们在 clean 眼里是无主文件,却是唯一一份。
+Blocked: `git clean -x` deletes gitignored files — credentials and local database snapshots
+usually fall into this category; in clean's eyes they are unowned files, yet they are the only copy.
 MSG
   exit 2
 fi
 
-# ── 软确认:会静默把正式环境退回开发配置 ──────────────────────────────────
+# ── Soft confirmation: would silently revert prod to the dev config ───────────
 #
-# 不带 override 的 `up` 会让 compose 只读基础文件,源码 bind mount 回来,于是
-# 后续 `git merge` 时前后端在半新半旧的代码之间反复热重载。这个错误不毁数据,
-# 但它是静默的——容器照样起来,页面照样能开。所以问一句,而不是拦死。
+# `up` without the override makes compose read only the base file, so the source
+# bind mount comes back, and during a later `git merge` the frontend and backend
+# hot-reload back and forth between half-new, half-old code. This mistake does not
+# destroy data, but it is silent — the containers still start, the page still
+# opens. So ask, rather than hard-block.
 if printf '%s' "$CMD" | grep -qE 'docker[[:space:]]+compose\b' \
    && printf '%s' "$CMD" | grep -qE '\b(up|restart)\b' \
    && ! printf '%s' "$CMD" | grep -q "$PROD_OVERRIDE"; then
@@ -103,9 +118,9 @@ print(json.dumps({"hookSpecificOutput": {
     "hookEventName": "PreToolUse",
     "permissionDecision": "ask",
     "permissionDecisionReason": (
-        f"正式环境目录下没带 {override}。这样起会退回开发配置——源码 bind mount "
-        "回来,之后 git merge 会让服务在半新半旧的代码之间反复热重载。确认要这样起吗?\n"
-        f"  正式:docker compose -f docker-compose.yml -f {override} up -d --build"
+        f"This is the prod directory, but {override} is not included. Starting this way reverts to the dev config — the source bind mount "
+        "comes back, and a later git merge will make services hot-reload back and forth between half-new, half-old code. Start it this way anyway?\n"
+        f"  prod: docker compose -f docker-compose.yml -f {override} up -d --build"
     ),
 }}))
 PY

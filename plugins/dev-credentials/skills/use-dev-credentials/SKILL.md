@@ -3,21 +3,21 @@ name: use-dev-credentials
 description: "Reads a machine-level credentials file (~/.local/share/dev-env/credentials.json) that the user has deliberately provisioned for agent use, to obtain a base URL and API key for actually running or testing code against a real LLM (or other) endpoint. Use whenever a task needs a working API key — running a script that calls a model, writing/executing an integration test, reproducing an API bug, verifying an SDK change — instead of asking the user to paste a key or reading the project's own .env. Also use to create the file for the first time when it does not exist yet. Triggers on: needing an API key to test, 'run this against a real model', no credentials available for a test run. Do NOT use this skill to read a project's real .env or any other secret — this file is the only credential source it is allowed to touch."
 ---
 
-# dev-credentials: agent 可用的测试凭证
+# dev-credentials: Test Credentials the Agent May Use
 
-## 这个 skill 是什么
+## What This Skill Is
 
-一份**用户主动提供给 agent 使用**的凭证文件。它存在的前提是：里面的 key 已经被用户限定了预算和权限（例如通过 LLM 网关签发的 virtual key），所以 **agent 读取和使用它是被明确授权的**，不需要每次询问。
+A credentials file that **the user deliberately provides for the agent to use**. It exists on the premise that the keys in it have already been limited in budget and permissions by the user (e.g. a virtual key issued through an LLM gateway), so **the agent is explicitly authorized to read and use it**, without asking each time.
 
-这和"保护项目 secret"是相反方向的事情，不要混淆：
+This points in the opposite direction from "protecting project secrets"; do not confuse the two:
 
-| | 项目的 `.env` | 本 skill 的凭证文件 |
+| | The project's `.env` | This skill's credentials file |
 |---|---|---|
-| agent 能否读取 | **不能** | **可以，这就是它的用途** |
-| 泄露后果 | 需要立即 rotate 真实凭证 | 有预算上限，作废即可，不影响其他东西 |
-| 谁写入 | 用户 | 用户（agent 只创建骨架，不填值） |
+| Can the agent read it | **No** | **Yes — that is its purpose** |
+| Consequence of a leak | The real credentials must be rotated immediately | It has a budget cap; just revoke it, nothing else is affected |
+| Who writes it | The user | The user (the agent only creates the skeleton, never fills in values) |
 
-## 文件位置与格式
+## File Location and Format
 
 ```
 ~/.local/share/dev-env/credentials.json
@@ -27,102 +27,102 @@ description: "Reads a machine-level credentials file (~/.local/share/dev-env/cre
 {
   "llm": {
     "base_url": "http://llm.localhost/openai",
-    "api_key": "<用户自己粘贴>",
-    "default_model": "<用户在网关里实际配了哪家就填哪个>",
-    "note": "网关签发的 dev virtual key，有预算上限"
+    "api_key": "<pasted by the user>",
+    "default_model": "<whichever model the user actually configured in the gateway>",
+    "note": "dev virtual key issued by the gateway, with a budget cap"
   }
 }
 ```
 
-顶层按用途分组（`llm`、以后可能有别的），每组至少包含 `base_url` 和 `api_key`。
+Top-level keys group entries by purpose (`llm`, possibly others later); each group contains at least `base_url` and `api_key`.
 
-**`base_url` 末段是协议方言，取决于代码用哪个 SDK**，不是固定值：`/openai` 给 OpenAI SDK 及一切 OpenAI 兼容客户端，`/anthropic` 给 Anthropic SDK，`/genai` 给 Google GenAI SDK。填错的表现是请求体格式对不上而被拒。`/v1` 加不加都行（各家 SDK 拼路径的习惯不同，网关对这层宽容）。
+**The last segment of `base_url` is the protocol dialect, determined by which SDK the code uses**; it is not a fixed value: `/openai` for the OpenAI SDK and every OpenAI-compatible client, `/anthropic` for the Anthropic SDK, `/genai` for the Google GenAI SDK. Getting it wrong shows up as the request being rejected because the body format doesn't match. `/v1` works with or without (SDKs differ in how they join paths, and the gateway is lenient at this layer).
 
-**`default_model` 不要照抄任何示例值**——它必须是用户在网关 Web UI 里实际配置了 provider 的模型。查当前配了哪些：
+**Do not copy `default_model` from any example value** — it must be a model for which the user actually configured a provider in the gateway Web UI. To see what is currently configured:
 
 ```bash
 curl -s http://llm.localhost/api/providers | jq -r '.providers[].name'
 ```
 
-只配了一家时模型名直接写（如 `deepseek-v4-flash`）；配了多家而模型名有歧义时，写成 `provider/model` 显式指定。
+If only one provider is configured, write the model name directly (e.g. `deepseek-v4-flash`); if several are configured and the model name is ambiguous, write it as `provider/model` to be explicit.
 
-**为什么放在 `~/.local/share/dev-env/` 顶层、而不是 `env/` 子目录里**：那个子目录整体被 `settings.json` 的一条 deny 规则挡住（见下），而本文件恰恰是**应该**被读的。两者只隔一层目录，位置搞错就会得到一个"文件明明在、却读不了"的困惑结果。
+**Why it lives at the top level of `~/.local/share/dev-env/`, not in the `env/` subdirectory**: that subdirectory is blocked as a whole by a deny rule in `settings.json` (see below), whereas this file is precisely the one that **should** be read. The two are only one directory level apart; put the file in the wrong place and you get the confusing result of "the file is clearly there, but it can't be read".
 
-放在工作区外则是另一个原因：项目目录会被 `git add -A` 波及，也会随 worktree 复制。放在这里，一台机器一份，所有项目共用。
+Keeping it outside the workspace is for a different reason: project directories get swept up by `git add -A`, and get copied along with worktrees. Here, there is one copy per machine, shared by all projects.
 
-**文件名叫什么无所谓**——`Read(**/.env)` 这类规则是**相对模式**，只匹配工作目录内的路径，对 `~/.local/share/dev-env/` 下的文件不起作用。真正起作用的是绝对路径规则：
+**The filename doesn't matter** — rules like `Read(**/.env)` are **relative patterns** that only match paths inside the working directory, and have no effect on files under `~/.local/share/dev-env/`. What actually takes effect is the absolute-path rule:
 
 ```
-Read(//Users/<用户名>/.local/share/dev-env/env/**)   ← 挡住 baseline 目录
+Read(//Users/<username>/.local/share/dev-env/env/**)   ← blocks the baseline directory
 ```
 
-注意它只圈了 `env/**`，没圈整个 `dev-env/`。这是被迫的设计——实测确认 **deny 优先于 allow，无法用 allow 给 deny 开例外**。所以不能"deny 整个目录 + allow 放行 credentials.json"，只能让本文件从一开始就落在 deny 范围之外。
+Note that it covers only `env/**`, not all of `dev-env/`. This design is forced — testing confirmed that **deny takes precedence over allow, and allow cannot carve an exception out of deny**. So "deny the whole directory + allow credentials.json" is impossible; the only option is for this file to sit outside the deny scope from the start.
 
-## 文件不存在时：创建骨架，不要填值
+## When the File Doesn't Exist: Create the Skeleton, Don't Fill In Values
 
 ```bash
 mkdir -p ~/.local/share/dev-env
 chmod 700 ~/.local/share/dev-env
 ```
 
-然后写入上面的 JSON 结构，`api_key` 留成占位符 `"<paste-your-dev-key-here>"`，`base_url` 如果能从上下文确定就填（例如本机跑着 LLM 网关就填 `http://llm.localhost/openai`），确定不了就留占位符。
+Then write the JSON structure above, with `api_key` left as the placeholder `"<paste-your-dev-key-here>"`. Fill in `base_url` if it can be determined from context (e.g. if an LLM gateway is running on this machine, use `http://llm.localhost/openai`); otherwise leave a placeholder.
 
-写完后 `chmod 600` 该文件，并**明确告诉用户去哪里填、填什么**。不要试图代为生成或猜测 key 值。
+After writing, `chmod 600` the file, and **tell the user explicitly where to fill in what**. Do not try to generate or guess key values on their behalf.
 
-## 读取方式
+## How to Read It
 
 ```bash
 jq -r '.llm.base_url' ~/.local/share/dev-env/credentials.json
 ```
 
-**关键：把值直接传给要执行的命令，不要 `cat` 整个文件、不要 `echo` key 本身。**
+**Key point: pass values straight into the command being run; do not `cat` the whole file, and do not `echo` the key itself.**
 
-理由是这个文件虽然可读，但 key 的明文一旦进入会话上下文，就会留在对话记录里、也可能被后续的上下文压缩带到别处。而实际使用完全不需要看到它：
+The reason: although this file is readable, once the plaintext key enters the session context it stays in the conversation transcript, and may be carried elsewhere by later context compaction. And actual use never requires seeing it:
 
 ```bash
-# 好：值只在进程环境里存在，不出现在输出中
+# Good: the values exist only in the process environment and never appear in output
 OPENAI_BASE_URL=$(jq -r '.llm.base_url' ~/.local/share/dev-env/credentials.json) \
 OPENAI_API_KEY=$(jq -r '.llm.api_key' ~/.local/share/dev-env/credentials.json) \
   python test_script.py
 
-# 坏：key 明文进入上下文
+# Bad: the plaintext key enters the context
 cat ~/.local/share/dev-env/credentials.json
 ```
 
-## `.localhost` 域名：curl 能解析，语言运行时不一定
+## `.localhost` Domains: curl Resolves Them, Language Runtimes May Not
 
-实测确认的坑：`curl http://llm.localhost` 正常返回 200，但 Python 的 `socket.getaddrinfo('llm.localhost', 80)` 抛 `gaierror: nodename nor servname provided`。原因是 curl 内置了"`.localhost` 一律指向环回地址"的特殊处理（RFC 6761），而 `getaddrinfo` 依赖系统解析，macOS 的 `/etc/hosts` 里默认只有 `localhost` 一条，没有子域通配。
+A pitfall confirmed by testing: `curl http://llm.localhost` returns 200 normally, but Python's `socket.getaddrinfo('llm.localhost', 80)` raises `gaierror: nodename nor servname provided`. The cause is that curl has built-in special handling that "always points `.localhost` at the loopback address" (RFC 6761), whereas `getaddrinfo` relies on system resolution, and macOS's `/etc/hosts` by default has only a single `localhost` entry, with no subdomain wildcard.
 
-所以**用 curl 验证通过，不代表项目代码能跑通**。遇到这个报错时不要去查网关或 key，那两样都是好的。三种处理：
+So **passing a curl check does not mean the project code will work**. When you hit this error, do not go investigating the gateway or the key; both are fine. Three ways to handle it:
 
-1. **让用户加一行 hosts**（一次性，对所有语言生效，需要 sudo，agent 不要代劳）：
+1. **Have the user add a hosts line** (one-time, works for all languages, requires sudo; the agent must not do it on their behalf):
    ```bash
    echo '127.0.0.1 llm.localhost' | sudo tee -a /etc/hosts
    ```
-2. **改用 IP + Host 头**（已实测可走通 Traefik 路由）：请求发往 `http://127.0.0.1/`，带 `Host: llm.localhost`。适合一次性验证，但要改代码。
-3. 若网关另有直连端口，绕开 Traefik 直接连。
+2. **Use the IP + a Host header instead** (confirmed by testing to route through Traefik): send the request to `http://127.0.0.1/` with `Host: llm.localhost`. Suitable for one-off checks, but requires changing code.
+3. If the gateway has a separate direct port, bypass Traefik and connect directly.
 
-诊断用这条，能一眼区分是解析问题还是网关问题：
+Use this for diagnosis; it tells at a glance whether it is a resolution problem or a gateway problem:
 
 ```bash
 python3 -c "import socket; print(socket.getaddrinfo('llm.localhost',80)[0][4])"
 ```
 
-## 使用前的检查
+## Pre-Use Checks
 
-1. **文件存在吗**：不存在就走上面的创建流程，然后停下来等用户填值——不要继续尝试其他获取凭证的途径（尤其不要转而去读项目的 `.env`）。
-2. **值还是占位符吗**：不要只比对 `<paste-your-dev-key-here>` 这一个字面量——骨架里三个字段的占位符各不相同，且用户可能自己改过写法。判据是**值被尖括号包着**：
+1. **Does the file exist**: if not, follow the creation flow above, then stop and wait for the user to fill in values — do not go on trying other ways to obtain credentials (in particular, do not fall back to reading the project's `.env`).
+2. **Are the values still placeholders**: do not compare only against the single literal `<paste-your-dev-key-here>` — the three fields in the skeleton each have different placeholders, and the user may have rewritten them in their own style. The criterion is **the value is wrapped in angle brackets**:
 
    ```bash
    jq -r '.llm | to_entries[] | select(.value | tostring | test("^<.*>$")) | .key' \
      ~/.local/share/dev-env/credentials.json
    ```
 
-   有任何输出就说明那些字段还没填。此时直接告诉用户去填哪几个，不要拿占位符去发请求（会得到一个含义不明的 401 或 provider 解析失败，反而更难排查）。这条检查只看键名和"是否形如占位符"，不会把真实值打进上下文。
+   Any output means those fields have not been filled in yet. In that case, tell the user directly which ones to fill in; do not send requests with placeholders (you would get an ambiguous 401 or a provider resolution failure, which is harder to debug). This check looks only at key names and "whether it looks like a placeholder", so it never prints real values into the context.
 
-## 明确不做的事
+## Explicit Don'ts
 
-- **不要把这个文件的路径或内容写进任何项目文件**。项目代码应该读 `OPENAI_BASE_URL` / `OPENAI_API_KEY` 这类标准环境变量，由调用方在运行时注入。这样项目本身不依赖这个文件的存在，别人 clone 下来也能跑。
-- **不要把它当成项目 `.env` 的替代品**。它只服务于"agent 需要跑一下试试"的场景。项目自己运行时的配置归 `mise-toolchain/link-env` 管。
-- **不要在这个文件里存需要 rotate 的真实凭证**。它的整个安全模型建立在"里面的 key 泄露了也不疼"之上——一旦放进生产 key，这个前提就没了，后续所有"可以放心读"的规则都不再成立。
-- **发现文件里像是放了真实凭证时**（例如 `sk-ant-api03-` 开头的原厂 key 而非网关签发的 virtual key），**提醒用户换成受限 key**，并在换掉之前不要使用它。
+- **Do not write this file's path or contents into any project file**. Project code should read standard environment variables like `OPENAI_BASE_URL` / `OPENAI_API_KEY`, injected by the caller at runtime. That way the project itself does not depend on this file existing, and anyone else who clones it can still run it.
+- **Do not treat it as a substitute for the project's `.env`**. It serves only the "the agent needs to try running this" scenario. The project's own runtime configuration belongs to `mise-toolchain/link-env`.
+- **Do not store real credentials that would need rotating in this file**. Its entire security model rests on "a leaked key here doesn't hurt" — once a production key goes in, that premise is gone, and none of the "safe to read" rules that follow hold anymore.
+- **If the file appears to contain real credentials** (e.g. a first-party key starting with `sk-ant-api03-` rather than a gateway-issued virtual key), **remind the user to replace it with a restricted key**, and do not use it until it has been replaced.

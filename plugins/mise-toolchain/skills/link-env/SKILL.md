@@ -3,50 +3,50 @@ name: link-env
 description: "Wires a project/worktree to a shared baseline .env kept outside the git working tree, with an optional per-worktree override layer, by writing a gitignored mise.local.toml. Picks the baseline from ~/.local/share/dev-env/env/ by name — <repo>.env when it exists, otherwise dev.env — without asking the user which one. Use when a new git worktree has no .env and shouldn't need one copied in by hand, when the same credentials must be reused across several worktrees of one repo, or when a single worktree needs to override a few env values without diverging from the shared baseline. Triggers on: worktree missing .env, sharing env across worktrees, overriding an env var in just one worktree. Do NOT use for toolchain versions (use setup-toolchain). Never create files in the baseline directory — the user provisions those by hand — and never read, print, or copy the contents of any baseline .env; this skill only wires up paths."
 ---
 
-# mise-toolchain: 跨 worktree 环境变量分层（link-env）
+# mise-toolchain: Layered Env Vars Across Worktrees (link-env)
 
-## 要解决的问题
+## The Problem
 
-`.env` 是未跟踪文件，`git worktree add` 不会把它带到新 worktree。结果是每建一个 worktree 就要手动复制一份 `.env`，且此后多份副本各自漂移，无从判断哪份是对的。
+`.env` is an untracked file, so `git worktree add` does not carry it into the new worktree. The result: every new worktree needs a hand-copied `.env`, and from then on the copies drift apart independently, with no way to tell which one is correct.
 
-## 方案：单一真源 + 可选覆盖层
+## Approach: Single Source of Truth + Optional Overlay
 
 ```
-~/.local/share/dev-env/env/     baseline 目录 —— 工作区外，全机器共用，只有用户能往里放文件
-  ├── dev.env                   通用回退：没有项目专属文件时用它
-  └── <repo>.env                项目专属：文件名与仓库名一致时优先选中
-<worktree>/.env.local           覆盖层 —— 该 worktree 私有，只写差异的几行，可以不存在
+~/.local/share/dev-env/env/     baseline directory — outside the workspace, shared machine-wide, only the user may put files here
+  ├── dev.env                   generic fallback: used when there is no project-specific file
+  └── <repo>.env                project-specific: preferred when the filename matches the repo name
+<worktree>/.env.local           overlay — private to this worktree, holds only the differing lines, may not exist
 ```
 
-在每个 worktree 里写一份 **`mise.local.toml`**：
+In each worktree, write a **`mise.local.toml`**:
 
 ```toml
 [env]
 _.file = [
-  "~/.local/share/dev-env/env/<选中的那一个>.env",  # baseline，见下面的选择规则
-  ".env.local",                                    # 本 worktree 私有覆盖，不存在时静默跳过
+  "~/.local/share/dev-env/env/<the-selected-one>.env",  # baseline, see the selection rule below
+  ".env.local",                                         # this worktree's private overlay; silently skipped if missing
 ]
 ```
 
-三条已实测确认的 `_.file` 行为（mise 2026.7）：
+Three `_.file` behaviors confirmed by testing (mise 2026.7):
 
-| 行为 | 结果 |
+| Behavior | Result |
 |---|---|
-| 数组内后者覆盖前者 | 是 —— 同名变量以 `.env.local` 为准 |
-| 列表中的文件不存在 | 静默跳过，不报错 —— 所以 `.env.local` 可以按需才创建 |
-| 路径中的 `~` | 会展开 |
+| Later entries in the array override earlier ones | Yes — for a variable defined in both, `.env.local` wins |
+| A listed file does not exist | Silently skipped, no error — so `.env.local` can be created only when needed |
+| `~` in the path | Expanded |
 
-注意最后一条和 Docker Compose 相反：Compose 的 `env_file:` **不展开 `~`**，那边必须写 `${HOME}`。两处配置容易互相照抄，写错时表现为"容器读不到变量但宿主机正常"。
+Note that the last one is the opposite of Docker Compose: Compose's `env_file:` **does not expand `~`**; there you must write `${HOME}`. The two configs are easy to copy from each other, and getting it wrong shows up as "the container can't see the variable but the host is fine".
 
-## baseline 选择规则（agent 必须按此判定，不要询问用户选哪个）
+## Baseline Selection Rule (the agent must apply this check itself; do not ask the user which one to use)
 
-设仓库名为 `<repo>`（**仓库名，不是 worktree 目录名**——同一仓库的所有 worktree 必须指向同一个 baseline）：
+Let the repo name be `<repo>` (**the repo name, not the worktree directory name** — every worktree of the same repo must point at the same baseline):
 
-1. `~/.local/share/dev-env/env/<repo>.env` 存在 → 用它。
-2. 否则 `~/.local/share/dev-env/env/dev.env` 存在 → 用它。
-3. 两者都不存在 → **停下来告诉用户**，不要继续，也不要转而去读项目自己的 `.env`。
+1. `~/.local/share/dev-env/env/<repo>.env` exists → use it.
+2. Otherwise, `~/.local/share/dev-env/env/dev.env` exists → use it.
+3. Neither exists → **stop and tell the user**. Do not continue, and do not fall back to reading the project's own `.env`.
 
-判定只用存在性检查，不读内容：
+The check uses existence tests only; it does not read contents:
 
 ```bash
 REPO=$(basename "$(git rev-parse --path-format=absolute --git-common-dir | xargs dirname)")
@@ -54,93 +54,93 @@ ENVDIR=~/.local/share/dev-env/env
 test -f "$ENVDIR/$REPO.env" && echo "$REPO.env" || { test -f "$ENVDIR/dev.env" && echo dev.env; }
 ```
 
-用 `--git-common-dir` 而不是 `--show-toplevel`：在 worktree 里后者返回 worktree 目录名（如 `backend-skeleton`），会选错 baseline。
+Use `--git-common-dir`, not `--show-toplevel`: inside a worktree the latter returns the worktree directory name (e.g. `backend-skeleton`), which selects the wrong baseline.
 
-**选中的是哪一个，就在 `_.file` 里写哪一个——只写一个，不要把 `dev.env` 和 `<repo>.env` 同时列进去。**
+**Whichever file is selected is the one you write into `_.file` — write only one; do not list both `dev.env` and `<repo>.env`.**
 
-这一点必须清楚，因为它有个反直觉的后果（已实测）：两个文件是**替换关系而非补丁关系**。假如 `dev.env` 有 `LLM_API_KEY` 和 `LLM_MODEL`，而 `prison-a.env` 只写了 `LLM_MODEL`，那么选中 `prison-a.env` 后 **`LLM_API_KEY` 会直接消失**，表现为运行时报缺少凭证。
+This must be clear because it has a counterintuitive consequence (confirmed by testing): the selected file **replaces the other, it does not patch it**. If `dev.env` has `LLM_API_KEY` and `LLM_MODEL`, and `prison-a.env` contains only `LLM_MODEL`, then once `prison-a.env` is selected, **`LLM_API_KEY` simply disappears**, showing up at runtime as missing credentials.
 
-所以项目专属文件必须**自带全部所需变量**，而不是只写差异。如果你想要的是"通用打底 + 项目覆盖"的叠加语义，那要在 `_.file` 里同时列两个（前者打底、后者覆盖）——但这不是本 skill 的默认约定，除非用户明确要求叠加，否则一律按上面的独占规则来。
+So a project-specific file must **contain every variable it needs**, not just the differences. If what you want is layered "generic base + project override" semantics, you would list both in `_.file` (the former as the base, the latter as the override) — but that is not this skill's default convention. Unless the user explicitly asks for layering, always follow the exclusive rule above.
 
-## 绝对不要代为创建 baseline 文件
+## Never Create Baseline Files on the User's Behalf
 
-`~/.local/share/dev-env/env/` 里的任何 `.env` 文件**只能由用户手动创建**。agent 不得 `touch`、`cp`、`mv`、重定向写入，或以任何方式在该目录下产生文件——包括"从项目现有 `.env` 复制一份过去"这种看起来很自然的操作。
+Any `.env` file in `~/.local/share/dev-env/env/` **may only be created by the user by hand**. The agent must not `touch`, `cp`, `mv`, redirect-write, or in any other way produce a file in that directory — including the seemingly natural "copy the project's existing `.env` over there".
 
-理由：这个目录是凭证的唯一真源。让 agent 经手意味着凭证内容会流经会话上下文；而一个被 agent 凭空创建的、内容是猜测或占位符的 baseline，比文件不存在更糟——后者会立刻报错，前者会一路跑到某个语义不明的 401 才暴露。
+Rationale: this directory is the single source of truth for credentials. Letting the agent handle it means credential contents flow through the session context. And a baseline the agent conjured out of thin air, filled with guesses or placeholders, is worse than a missing file — the latter fails immediately, while the former runs all the way until some ambiguous 401 exposes it.
 
-需要新建时，把命令交给用户自己执行：
+When a new one is needed, hand the commands to the user to run themselves:
 
 ```bash
-# 项目专属 baseline（注意：要写全所有变量，不能只写差异）
+# Project-specific baseline (note: must include every variable, not just the differences)
 $EDITOR ~/.local/share/dev-env/env/<repo>.env
 chmod 600 ~/.local/share/dev-env/env/<repo>.env
 ```
 
-注意 `settings.json` 里那条针对 `env/**` 的 Read deny 会**连带挡住对该目录的 Bash 写操作**（如 `chmod`），这也是上面这些命令必须交给用户执行的又一个原因。存在性检查（`test -f`）不受影响，选择规则照常可用。
+Note that the Read deny on `env/**` in `settings.json` **also blocks Bash write operations on that directory** (such as `chmod`), which is one more reason the commands above must be handed to the user. Existence checks (`test -f`) are unaffected, so the selection rule still works.
 
-## 为什么是 mise.local.toml，不是 mise.toml
+## Why mise.local.toml, Not mise.toml
 
-`mise.toml` 要进 git。baseline 路径是机器级的绝对路径，写进 `mise.toml` 会带来两个后果：一是配置不可移植（换台机器/别人 clone 就是错的），二是每个 worktree 各自改这一行会造成 merge 冲突，甚至把某个 worktree 的私有路径误提交进主分支。
+`mise.toml` goes into git. The baseline path is a machine-level absolute path; writing it into `mise.toml` has two consequences: first, the config is not portable (wrong on another machine or for anyone else who clones it); second, each worktree editing this line on its own causes merge conflicts, and can even get one worktree's private path committed to the main branch by mistake.
 
-`mise.local.toml` 是 mise 官方的本地覆盖机制，加载优先级高于 `mise.toml`（`mise cfg` 可以看到完整加载链）。它 gitignore 之后：
+`mise.local.toml` is mise's official local override mechanism, loaded with higher priority than `mise.toml` (`mise cfg` shows the full load chain). Once it is gitignored:
 
-- `mise.toml` —— `[tools]`，进 git，跨 worktree 共享（`setup-toolchain` skill 负责）
-- `mise.local.toml` —— `[env]`，gitignored，per-worktree（本 skill 负责）
+- `mise.toml` — `[tools]`, in git, shared across worktrees (owned by the `setup-toolchain` skill)
+- `mise.local.toml` — `[env]`, gitignored, per-worktree (owned by this skill)
 
-两个 skill 各写各的文件，永不互相覆盖。这个分工和 Docker Compose 侧（`docker-compose.yml` 进 git、`docker-compose.override.yml` gitignored）是同一套心智模型。
+The two skills each write their own file and never overwrite each other. This split follows the same mental model as the Docker Compose side (`docker-compose.yml` in git, `docker-compose.override.yml` gitignored).
 
-## 操作步骤
+## Steps
 
-1. **确认 `.gitignore` 覆盖了这两个文件**，没有就补上：
+1. **Confirm `.gitignore` covers both files**; add them if not:
 
    ```gitignore
    mise.local.toml
    .env.local
    ```
 
-   这一步必须先做。先写文件后补 gitignore，中间任何一次 `git add -A` 都可能把它们提交进去。
+   This step must come first. If you write the files first and add the gitignore entries afterwards, any `git add -A` in between may commit them.
 
-2. **按上面的选择规则挑出 baseline**（`<repo>.env` 优先，回退 `dev.env`），只做存在性检查，不读内容。
+2. **Pick the baseline using the selection rule above** (`<repo>.env` first, falling back to `dev.env`), with existence checks only, never reading contents.
 
-   两个都不存在时**停下来告诉用户**，不要代为创建、不要从项目现有 `.env` 复制过去、也不要转而去读项目的 `.env`。交给用户执行的命令：
+   If neither exists, **stop and tell the user**. Do not create one on their behalf, do not copy the project's existing `.env` over, and do not fall back to reading the project's `.env`. Commands to hand to the user:
 
    ```bash
-   $EDITOR ~/.local/share/dev-env/env/dev.env      # 或 <repo>.env
+   $EDITOR ~/.local/share/dev-env/env/dev.env      # or <repo>.env
    chmod 600 ~/.local/share/dev-env/env/dev.env
    ```
 
-3. **写 `mise.local.toml`**，内容如上。已存在同名文件时不要整体覆盖，只在 `[env]` 段内合并。
+3. **Write `mise.local.toml`** with the content shown above. If a file with that name already exists, do not overwrite it wholesale; merge only within the `[env]` section.
 
-4. **`mise trust`** —— 新文件默认不受信任，未 trust 时 mise 命令会报 "error parsing config file"（首行具有误导性，实际原因是信任而非语法）。
+4. **`mise trust`** — new files are untrusted by default, and until trusted, mise commands fail with "error parsing config file" (the first line is misleading; the real cause is trust, not syntax).
 
-5. **验证**：
+5. **Verify**:
 
    ```bash
-   mise env -D | cut -d= -f1 | ugrep '<某个已知的变量名>'
+   mise env -D | cut -d= -f1 | ugrep '<some-known-var-name>'
    ```
 
-   **`cut -d= -f1` 这一段不能省。** `mise env -D` 的输出是 `KEY=value`，直接 `ugrep 变量名` 会把匹配行**连值一起**打印出来——凭证就这样进了终端和会话上下文，正是这个 skill 要避免的事。先 `cut` 掉 `=` 后面的部分，就只剩变量名。
+   **The `cut -d= -f1` part must not be omitted.** `mise env -D` outputs `KEY=value`; running `ugrep <var-name>` on it directly prints the matching line **along with its value** — that is exactly how credentials end up in the terminal and the session context, which is precisely what this skill is meant to prevent. Cutting off everything after `=` first leaves only the variable names.
 
-   同理也不要直接看 `mise env -D` 的完整输出。
+   Likewise, do not look at the full output of `mise env -D` directly.
 
-## 需要修改某个 worktree 的 env 时
+## When a Worktree's Env Needs Changing
 
-在该 worktree 建 `.env.local`，**只写要改的那几行**，其余继续继承 baseline：
+Create `.env.local` in that worktree containing **only the lines you want to change**; everything else keeps inheriting from the baseline:
 
 ```bash
 echo 'API_BASE_URL=http://localhost:9999' >> .env.local
 ```
 
-不要复制整份 baseline 再改——那样就退回到"多份副本各自漂移"的原始问题，而且改了什么一眼看不出来。
+Do not copy the entire baseline and then edit it — that takes you back to the original "multiple copies drifting apart" problem, and what changed is no longer obvious at a glance.
 
-## 明确不做的事
+## Explicit Don'ts
 
-- **不要用 symlink 把 baseline 链接进 worktree**。symlink 是共享同一个文件，在任一 worktree 里修改会同时影响主仓库和其他所有 worktree，恰好破坏"单个 worktree 独立覆盖"这个需求。
-- **不要读取、打印、或复制 baseline 与 `.env.local` 的内容**。本 skill 的职责只是把路径接起来。需要确认某个变量是否生效时，用上面只查变量名的方式。
+- **Do not symlink the baseline into the worktree**. A symlink shares the same file, so editing it in any worktree simultaneously affects the main repo and every other worktree, which breaks exactly the "independent per-worktree override" requirement.
+- **Do not read, print, or copy the contents of the baseline or `.env.local`**. This skill's only job is wiring up paths. When you need to confirm a variable is in effect, use the names-only method above.
 
-  这条是**行为约束，不是靠工具拦截兜底的**。`settings.json` 里那条 `Read(//…/dev-env/env/**)` 只约束 Read 工具——实测确认 Bash 里的 `ugrep`、`jq`、`cat` 照样能读出内容。它挡的是"顺手 Read 一眼"，挡不住绕路。所以真正的边界在这条规则本身，不要因为"反正有 deny 规则"就放松。
-- **不要把 baseline 路径写进任何进 git 的文件**（`mise.toml`、`docker-compose.yml`、README 示例除外——文档里写占位符即可）。
+  This is a **behavioral constraint, not something backstopped by tool-level blocking**. The `Read(//…/dev-env/env/**)` rule in `settings.json` constrains only the Read tool — testing confirmed that `ugrep`, `jq`, and `cat` in Bash can still read the contents. It stops a casual "quick Read", not a workaround. So the real boundary is this rule itself; do not relax it because "there's a deny rule anyway".
+- **Do not write the baseline path into any file that goes into git** (`mise.toml`, `docker-compose.yml`; README examples are the exception — a placeholder is fine in docs).
 
-## 与容器侧的关系
+## Relationship to the Container Side
 
-如果项目同时通过 Docker Compose 运行，容器侧要读**同一份 baseline**，否则会出现"宿主机跑得通、容器里跑不通"这类最难排查的问题。容器侧的接法归 `dev-env-router` 插件的 `onboard` skill 管（写在 `docker-compose.override.yml` 里）；两边通过约定同一个 baseline 路径协作，不共享配置文件。
+If the project also runs via Docker Compose, the container side must read **the same baseline**; otherwise you get "works on the host, fails in the container", one of the hardest kinds of problem to debug. Wiring up the container side belongs to the `onboard` skill of the `dev-env-router` plugin (written in `docker-compose.override.yml`); the two sides cooperate by agreeing on the same baseline path and do not share config files.
