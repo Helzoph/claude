@@ -43,6 +43,12 @@
       "category": "development"
     },
     {
+      "name": "typesafe-jev",
+      "description": "Design guidance for building with Jev, TypeSafe's typed-judgment model: when a task is Jev-shaped, how to word questions, batch calls, compose Jev with code, LLMs and people, pick thresholds, and fail safely. API fields are always read from TypeSafe's live docs.",
+      "source": "./plugins/typesafe-jev",
+      "category": "development"
+    },
+    {
       "name": "emil-design-skills",
       "description": "Polished interface design, animation, motion review, and frontend tooling skills by Emil Kowalski.",
       "source": "./plugins/emil-design-skills",

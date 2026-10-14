@@ -1,0 +1,34 @@
+{
+  "name": "typesafe-jev",
+  "version": "0.1.0",
+  "description": "Design guidance for Jev, TypeSafe's typed-judgment model: task fit, question shape, batching, composition, thresholds, and failure handling.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "typesafe",
+    "jev",
+    "classification",
+    "llm",
+    "routing",
+    "design"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "TypeSafe Jev",
+    "shortDescription": "Design Jev calls that hold up in production",
+    "longDescription": "A design walk-through for features that call Jev: decide whether the task is Jev-shaped, word narrow questions, lay out state and fan out calls, compose Jev with code, LLMs and people, calibrate thresholds on held-out data, and choose fail-open or fail-closed behaviour. Backed by an evidence table of 38 hack day projects and 16 reusable patterns.",
+    "developerName": "helzoph",
+    "category": "Development",
+    "capabilities": [
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "这个功能适合用 Jev 做吗？",
+      "帮我 review 这段调用 Jev 的代码。"
+    ]
+  }
+}

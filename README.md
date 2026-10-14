@@ -41,6 +41,7 @@ before it runs plugin-bundled hooks.
 | [`dev-env-router`](plugins/dev-env-router) | Directory-derived identity for local dev environments via Docker Compose + a single shared Traefik router — no manual port bookkeeping across projects and worktrees. |
 | [`mise-toolchain`](plugins/mise-toolchain) | Project toolchain versions and cross-worktree env layering via mise — inherit the machine's own version preferences into `mise.toml`, and share one baseline `.env` across worktrees without copying secrets around. |
 | [`dev-credentials`](plugins/dev-credentials) | A single machine-level file holding budget-capped dev credentials an agent is explicitly allowed to read, so real project secrets never have to be exposed to get a test run working. |
+| [`typesafe-jev`](plugins/typesafe-jev) | Design guidance for building with Jev, TypeSafe's typed-judgment model — task fit, question shape, batching, composition, thresholds, and failure handling, backed by evidence from 38 hack day projects. API fields are always read from TypeSafe's live docs. |
 | [`emil-design-skills`](plugins/emil-design-skills) | Interface design, animation, motion review, and frontend tooling skills by Emil Kowalski. |
 
 `mise-toolchain` and `dev-env-router` share one convention: the baseline `.env`
@@ -84,6 +85,10 @@ skills stay current without silently changing the marketplace.
 │   │   ├── .claude-plugin/plugin.json  # Claude Code manifest
 │   │   ├── .codex-plugin/plugin.json   # Codex manifest
 │   │   └── skills/                     # use-dev-credentials
+│   ├── typesafe-jev/
+│   │   ├── .claude-plugin/plugin.json  # Claude Code manifest
+│   │   ├── .codex-plugin/plugin.json   # Codex manifest
+│   │   └── skills/                     # jev-design (+ references/hackday-evidence.md)
 │   └── dev-env-router/
 │       ├── .claude-plugin/plugin.json  # Claude Code manifest
 │       ├── .codex-plugin/plugin.json   # Codex manifest

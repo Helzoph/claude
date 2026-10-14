@@ -1,0 +1,19 @@
+{
+  "name": "typesafe-jev",
+  "version": "0.1.0",
+  "description": "Design guidance for building with Jev, TypeSafe's typed-judgment model: when a task is Jev-shaped, how to word questions, batch calls, compose Jev with code, LLMs and people, pick thresholds, and fail safely. Field-tested lessons from a 38-project hack day; API fields are always read from TypeSafe's live docs.",
+  "author": {
+    "name": "helzoph"
+  },
+  "homepage": "https://github.com/helzoph/claude",
+  "repository": "https://github.com/helzoph/claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "typesafe",
+    "jev",
+    "classification",
+    "llm",
+    "routing",
+    "design"
+  ]
+}
