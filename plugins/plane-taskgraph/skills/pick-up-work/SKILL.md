@@ -1,6 +1,6 @@
 ---
 name: pick-up-work
-description: "Read a feature's task graph back from Plane and compute which work items can start right now, by checking whether each item's blocked_by dependencies are all done; when the unblocked item is a Module's acceptance item, run its listed tests and record the outcome. Use this skill when picking up work on a feature already recorded in Plane — triggers on 'implement the xxx feature', 'what can I work on next', 'what's unblocked', 'is this module done'. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane instead)."
+description: "Read a feature's task graph back from Plane and compute which work items can start right now, by checking whether each item's blocked_by dependencies are all done; then do an item — commit with a `Refs: <ITEM-ID>` trailer, post a verification-record comment whose changed-files block is generated from git by a bundled script, and only then mark it done; when the unblocked item is a Module's acceptance item, run its listed tests and record the outcome. Use this skill when picking up work on a feature already recorded in Plane — triggers on 'implement the xxx feature', 'what can I work on next', 'what's unblocked', 'is this module done'. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane instead)."
 ---
 
 # Read the Task Graph Back From Plane and Compute What Can Start Now
@@ -68,6 +68,52 @@ workitem(action="update", workitem_id=..., state=<UUID of a state in the started
 First run `state(action="list")` to get the UUID of a state whose group is `started` in that project.
 
 ⚠️ **The `state_group` in `update`'s response is stale** — after changing to Done, the response's `state` and `completed_at` are updated but `state_group` is still the old value. To double-check, `list` again. Trust it and a just-finished item is treated as unfinished, **so the next parallel-set computation comes up short**.
+
+Moving an item into the `completed` group has its own gate — see "Verification Record" below.
+
+## Commits: One Trailer per Item
+
+Every commit made for an item ends its message with the trailer line
+
+```
+Refs: <ITEM-ID>
+```
+
+e.g. `Refs: FMTLAB-12`. Commit locally; do **not** `git push`. Reason: the trailer is what binds commits to the item — it survives merges and does not depend on branch start points or time ranges — and `changed-files.sh` (below) finds commits by it. A commit without it is invisible to the record.
+
+## Verification Record (Required Before `completed`)
+
+After running the item's `验证` steps, post **one** comment (`workitem_comment(action="create", comment_html=...)`, HTML) with exactly these four `h3` blocks, in this order:
+
+| Block | Content |
+|---|---|
+| `验证记录` | First line: the verdict, `通过` or `失败`. Then who ran it and the code version (`git rev-parse --short HEAD`). |
+| `改动文件` | The output of `changed-files.sh`, pasted **unchanged**. Then a `范围对照` paragraph: files changed outside the item's `涉及范围`, and places in `涉及范围` that were not touched — each with `原因：`. |
+| `已执行` | Per V number from the body: the command, exit code, and the key output lines. For an e2e, also the `session_id`. |
+| `未验证` | V numbers that were not run, each with the reason. Write `无` if all ran. |
+
+### Generating `改动文件`
+
+Run, inside the target repository (`<skill dir>` is the "Base directory for this skill" shown when this skill loaded):
+
+```bash
+bash "<skill dir>/scripts/changed-files.sh" <ITEM-ID> [ignored-path ...]
+```
+
+It prints HTML: the current HEAD; every commit whose message has the whole line `Refs: <ITEM-ID>` (so `FMTLAB-1` never matches `FMTLAB-12`) with its `--name-status`; the union of their files; and `git status --porcelain`. Paths are HTML-escaped.
+
+- **Never write or edit this block by hand.** Reason: a hand-written list drops files, adds files, and nobody can tell it disagrees with the real commits.
+- If the script exits non-zero with `no commit has trailer`, the commits are missing the trailer. Fix that (amend locally, or commit the work with the trailer) — do not post an empty list, which reads as "nothing changed".
+- A file the item changed but `.gitignore` hides (e.g. a gitignored `CLAUDE.md`) appears in neither `git log` nor `git status`. Pass its path as an extra argument; the script adds a `git 看不到的改动` list with the `git check-ignore -v` line as evidence, and refuses paths that are not actually ignored.
+
+### The Gate
+
+- **No verification-record comment → do not move the item to the `completed` group.** This holds even when the user asks to skip it; say why and stop.
+- **A file outside `涉及范围` whose reason you cannot state → do not mark done; ask the user.**
+- **Re-check the version just before marking done.** Run `git rev-parse --short HEAD` again; if it differs from the version in the record, the code changed after verification — run the V steps again and post a new record.
+- **A failed run is recorded too**, with verdict `失败`, and the item stays open.
+- **Only ever append comments; never edit or delete an earlier one.** Earlier records are the history; an edited record makes a past failure disappear.
+- Long logs go into `workitem_attachment` or `workitem_link`; the comment keeps the few lines that show the result. Reason: nobody reads a comment that is mostly log.
 
 ## Judge Completion by State Group, Never by State Name
 
