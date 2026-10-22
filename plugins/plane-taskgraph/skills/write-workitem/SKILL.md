@@ -9,6 +9,15 @@ A work item body is read back later by an agent that has none of today's context
 
 The block names and sub-labels below are Chinese literals written into Plane. Keep them in Chinese exactly as shown: people read them in the Plane UI, and `pick-up-work` matches them verbatim on read-back. Write the prose inside the blocks in the user's language.
 
+## Creating a New Item
+
+1. **Pick the Module(s) first** — invoke the `plane-taskgraph:write-module` skill and follow its "Attaching an Item" rules against the places this item will list in `涉及范围`. If no existing Module fits, write-module says to stop and ask: do that **before** creating the item. Reason: an item created without a Module is invisible to anyone reading the board by Module, and `pick-up-work` never offers it.
+2. Write the body per this skill, then `workitem(action="create", labels=[<the one risk:* label id>])` — see "The Risk Label".
+3. Attach it to every Module chosen in step 1 (`module(action="manage_workitems")`) and read back, as write-module describes.
+4. Run "After Writing" below.
+
+Skipping step 3 is the common failure: the item exists, looks complete, and is attached to nothing.
+
 ## The Template
 
 Blocks appear in this order. The first five are **required**; the last three are optional and are **deleted entirely** (heading included) when empty — an empty heading reads as "someone forgot", not "nothing to say".
@@ -86,6 +95,21 @@ The first word is the level. Then list **each** distinct failure symptom — wha
 Rate the item by the **most dangerous** place listed in `涉及范围`. When unsure, go one level higher: rating too low means it ships with nobody looking; rating too high costs one extra pause.
 
 **Every symptom listed in 风险 must be covered by at least one V item.** A risk that is written down but never checked is decoration.
+
+### The Risk Label
+
+The level is also a Label, so it shows in lists and can be queried (`label IN ("risk:high")`). Exactly three names, character for character:
+
+```
+risk:high    risk:medium    risk:low
+```
+
+- **Every item carries exactly one of them**, and it matches the first word of `风险` (`risk:high` ↔ `high`, …). No `Risk-High`, no `risk:med`. Reason: `pick-up-work` decides when to pause by this Label; zero, two, or a misspelt one means it cannot tell the level.
+- **Get the ids first**: `label(action="list", project_id=...)`. Labels are per project. If any of the three is missing, create it with exactly that name (`label(action="create")`) and tell the user at the end which ones you created.
+- **Changing an existing item's level**: `retrieve` its current `labels`, drop the old `risk:*` id, add the new one, keep every other Label id, and send the new `labels` **in the same `update` as the edited 风险 text**. Reason: `labels` in `update` replaces the whole list — sending only the risk Label erases the user's other Labels — and two separate updates leave a window where Label and text disagree.
+- **Adding a level to an old item that has none**: add the Label (keep the others) and leave the title alone.
+- Never put the level in the title (no bracketed letter prefix) or in `priority`. Reason: priority is how urgent, risk is how hard to undo; and a second copy of the level drifts from the Label.
+- **`high` requires a `回退` block.** If you cannot write how to undo it, stop and ask before creating the item.
 
 ### 完成标准
 
@@ -194,4 +218,4 @@ Which Module it belongs to, what it depends on, and what state it is in. Each ha
 
 ## After Writing
 
-Read the item back (`description_html`) and check: the `h3` sequence is 为什么, 涉及范围, 风险, 完成标准, 验证, then only 不做 / 回退 / 注意; every C and V is numbered; at least one V is e2e (or `e2e：不适用` with a reason); no U+FFFD. Then report the item's identifier and title to the user.
+Read the item back (`description_html`) and check: the `h3` sequence is 为什么, 涉及范围, 风险, 完成标准, 验证, then only 不做 / 回退 / 注意; every C and V is numbered; at least one V is e2e (or `e2e：不适用` with a reason); no U+FFFD; exactly one `risk:*` Label, matching the first word of 风险. For a new item, also confirm it is attached to its Module(s). Then report the item's identifier, title, risk Label, and Module(s) to the user.
