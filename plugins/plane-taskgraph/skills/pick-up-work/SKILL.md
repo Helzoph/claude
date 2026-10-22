@@ -123,15 +123,34 @@ There are exactly five groups: `backlog` / `unstarted` / `started` / `completed`
 
 ## Before Actually Starting: Confirm the Item Has Completion Criteria
 
-After choosing the item to work on, read its description (step 1 trimmed the description to save tokens, so fetch it once here with `workitem(action="retrieve")`).
+After choosing the item to work on, read its description (step 1 trimmed the description to save tokens, so fetch it once here with `workitem(action="retrieve", fields="description_html,...")`).
 
-The description should contain a `完成标准` section (see the template in `plan-to-plane`). **If it does not, stop and ask the user** — do not infer from the title what counts as done.
+### Splitting the Body Into Blocks
+
+Always split `description_html`, **never `description_stripped`** — stripping removes the headings, and block titles become indistinguishable from body lines.
+
+Two formats exist in Plane, and both must be read:
+
+1. **Current format (write-workitem):** each block starts at an `h3` whose text is the block name. Match the tag with attributes allowed — `<h3[^>]*>` — because a body saved from the web editor comes back as `<h3 class="editor-heading-block" data-id="…">`. A block runs until the next `h3`.
+2. **Old format** (only when the body has no `h3` at all): each block starts at a paragraph whose leading `<strong>` holds the block name, e.g. `<p><strong>完成标准</strong>: …</p>`; the block runs until the next such `<strong>` name. Map old names onto current blocks:
+
+   | Old name | Current block |
+   |---|---|
+   | `为什么` / `完成标准` / `注意` | same name |
+   | `完成定义` | `完成标准` |
+   | `必须通过的测试` + `手动验证` | `验证` (both together) |
+
+A block's content is everything between its heading and the next block heading — no more. Reason: if one block bleeds into the next (`注意` read as part of `完成标准`), the item gets marked done against the wrong criteria, and nothing looks wrong.
+
+### Required Blocks
+
+The body should contain `完成标准` and `验证` (see write-workitem). **If either is missing, stop and ask the user** — do not infer from the title what counts as done.
 
 ⚠️ **The acceptance item is the exception**: its template has "完成定义" + "必须通过的测试", not "完成标准". Do not treat it as missing the template — first recognize it per the next section, then follow that flow.
 
 Reason: the title says only what to do, not how far to go to be done. When acceptance criteria guessed from the title differ from the one in the user's head, you stop where you think you are done, and the user gets a half-finished product — **and neither side knows which step went wrong**.
 
-Old items missing this section is normal (the template came later). Ask one question to clarify, and while at it run `workitem(action="update")` to add it to the description, so it need not be asked again next time.
+Old items missing these blocks is normal (the template came later). Ask one question to clarify, then add the answer to the body in the current h3 format, following write-workitem's "Editing an Existing Body" — so it need not be asked again next time.
 
 ## When the Item That Surfaces Is the Acceptance Item (`<module name> 验收`)
 
