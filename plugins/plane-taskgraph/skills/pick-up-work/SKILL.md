@@ -1,6 +1,6 @@
 ---
 name: pick-up-work
-description: "Read a task graph back from Plane and compute which work items can start right now, by checking whether each item's blocked_by dependencies are all done; then do an item — read its body (current h3 or old strong-heading format), pause for the user according to its risk:* Label, commit with a `Refs: <ITEM-ID>` trailer, post a verification-record comment whose changed-files block is generated from git by a bundled script, and only then mark it done. Use this skill when picking up work already recorded in Plane — triggers on 'implement the xxx feature', 'do ABC-12', 'what can I work on next', 'what's unblocked'. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane) or for writing an item body (use write-workitem)."
+description: "Read a task graph back from Plane and compute which work items can start right now, by checking whether each item's blocked_by dependencies are all done; then do an item — read its body (current h3 or old strong-heading format), pause for the user according to its risk:* Label, commit with a `Refs: <ITEM-ID>` trailer, post a verification-record comment whose changed-files block is generated from git by a bundled script, and only then mark it done. Use this skill when picking up work already recorded in Plane — triggers on 'implement the xxx feature', 'do ABC-12', 'what can I work on next', 'what's unblocked', and status questions such as 'is the X module done?' or 'how far along is X?'. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane) or for writing an item body (use write-workitem)."
 ---
 
 # Read the Task Graph Back From Plane and Compute What Can Start Now
@@ -170,6 +170,12 @@ It prints HTML: the current HEAD; every commit whose message has the whole line 
 There are exactly five groups: `backlog` / `unstarted` / `started` / `completed` / `cancelled`. **State names can be changed freely; groups cannot**, so judgments can only be based on the group.
 
 **New items land in `backlog` by default**, not `unstarted`. So `backlog` does not mean "not yet in the plan" — when excluding, exclude only `completed` and `cancelled`; do not exclude `backlog` as well.
+
+### "Is Module X Done?"
+
+Answer from the states of the items attached to that Module — nothing else holds this. Run step 1 without the `openStates()` filter, and report the count per state group plus every item not in `completed` / `cancelled`. **Read only; run no tests.** Reason: the question asks for status, and each item's own verification record already says what was verified.
+
+If no Module has that name, say so and list the project's Modules; do not guess from item titles.
 
 ## Report to the User
 
