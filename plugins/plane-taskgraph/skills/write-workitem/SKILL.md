@@ -128,6 +128,8 @@ Numbered `V1`, `V2`, …. Each V starts with its type and a short title, followe
 - `预期` — something directly comparable: an exact output line, a count, an exit code, a field value read back. Never "works", "no errors", "looks right" — those cannot be checked against a run.
 - `覆盖` — which C numbers, and which 风险 symptom(s) by quoting them in 「」.
 
+**A `预期` of "no output" or a count of 0 needs a positive control in the same V** — run the same pattern on input that must match (e.g. `git show <commit before the change>:<path>`) and expect a count ≥ 1. Reason: a mistyped pattern also prints nothing, so the check passes without testing anything. One real case: `ugrep` reads patterns as ERE, where `a\|b` matches a literal `|`; write `a|b`, or pass `-G` for the `\|` form.
+
 Three types, and only three:
 
 | Type | Means |
