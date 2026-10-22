@@ -138,7 +138,7 @@ After running the item's `验证` steps, post **one** comment (`workitem_comment
 |---|---|
 | `验证记录` | First line: the verdict, `通过` or `失败`. Then who ran it and the code version (`git rev-parse --short HEAD`). |
 | `改动文件` | The output of `changed-files.sh`, pasted **unchanged**. Then a `范围对照` paragraph: files changed outside the item's `涉及范围`, and places in `涉及范围` that were not touched — each with `原因：`. |
-| `已执行` | Per V number from the body: the command, exit code, and the key output lines. For an e2e, also the `session_id`. |
+| `已执行` | Per V number from the body: the command, exit code, and the key output lines. For an e2e run through `claude -p`, also its `session_id`; other e2e entries (a CLI, `curl`, a browser run) have none, so do not write one. |
 | `未验证` | V numbers that were not run, each with the reason. Write `无` if all ran. |
 
 #### Generating `改动文件`
