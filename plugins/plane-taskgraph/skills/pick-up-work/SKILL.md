@@ -140,6 +140,8 @@ Two formats exist in Plane, and both must be read:
    | `完成定义` | `完成标准` |
    | `必须通过的测试` + `手动验证` | `验证` (both together) |
 
+After mapping, work with and report blocks **only under their current names** — an old item's `完成定义` *is* its `完成标准`, and its `必须通过的测试` and `手动验证` together *are* its `验证`. Reason: everything downstream (the required-block check, the verification record's per-V list) looks for the current names; carrying an old name forward makes a present block look missing.
+
 A block's content is everything between its heading and the next block heading — no more. Reason: if one block bleeds into the next (`注意` read as part of `完成标准`), the item gets marked done against the wrong criteria, and nothing looks wrong.
 
 ### Required Blocks
