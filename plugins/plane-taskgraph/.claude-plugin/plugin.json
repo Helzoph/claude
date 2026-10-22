@@ -1,7 +1,7 @@
 {
   "name": "plane-taskgraph",
-  "version": "0.1.0",
-  "description": "Turn design conversations into a structured task graph in Plane: features become Modules, ordering becomes blocked_by relations, and \"what can start now\" is computed from the graph instead of stored as prose.",
+  "version": "0.2.0",
+  "description": "Turn design conversations into a structured task graph in Plane: functional areas become Modules, ordering becomes blocked_by relations, risk becomes a risk:* Label that decides when the agent pauses, and every finished item carries a verification record with git-generated changed files.",
   "author": {
     "name": "helzoph"
   },

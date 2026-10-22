@@ -1,7 +1,7 @@
 {
   "name": "plane-taskgraph",
-  "version": "0.1.0",
-  "description": "Structured task graphs in Plane: features as Modules, ordering as blocked_by relations, parallelism computed rather than stored.",
+  "version": "0.2.0",
+  "description": "Structured task graphs in Plane: functional areas as Modules, ordering as blocked_by relations, risk as a Label, and a verification record before anything is marked done.",
   "author": {
     "name": "helzoph"
   },
@@ -20,7 +20,7 @@
   "interface": {
     "displayName": "Plane Task Graph",
     "shortDescription": "Design talk in, structured Plane task graph out",
-    "longDescription": "Skills for recording a design discussion into Plane as a dependency graph (Module per feature, blocked_by relations for ordering), and for reading it back to compute which work items can start in parallel right now.",
+    "longDescription": "Skills for writing Plane work items to a fixed template (why, scope, risk, done-criteria, verification), attaching them to functional-area Modules, recording a design as a blocked_by dependency graph, and reading it back to compute what can start now — then doing an item with risk-based pauses, Refs trailers on commits, and a verification-record comment whose changed-files list is generated from git.",
     "developerName": "helzoph",
     "category": "Development",
     "capabilities": [
@@ -29,7 +29,8 @@
     ],
     "defaultPrompt": [
       "把刚才讨论的设计记到 Plane 里。",
-      "帮我实现 xxx feature。"
+      "现在能开工哪些？",
+      "做 ABC-12。"
     ]
   }
 }
