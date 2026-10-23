@@ -1,6 +1,6 @@
 {
   "name": "plane-taskgraph",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Structured task graphs in Plane: functional areas as Modules, ordering as blocked_by relations, risk as a Label, and a verification record before anything is marked done.",
   "author": {
     "name": "helzoph"

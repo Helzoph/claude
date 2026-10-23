@@ -98,17 +98,22 @@ Old items missing these blocks is normal (the template came later). Ask one ques
 
 The level comes from the item's Label — exactly one of `risk:high` / `risk:medium` / `risk:low` (rules in write-workitem). `labels` on an item are **ids**: map them to names with `label(action="list", project_id=...)` first. Reason: comparing an id with `risk:high` never matches, and every item would look unlabelled.
 
-| Level | Pause before any write | Pause before marking done |
+| Level | Before any write | Before marking done |
 |---|---|---|
-| `risk:high` | **yes** — after reading the body, before changing state, editing files, or committing | **yes** |
-| `risk:medium` | no | **yes** |
+| `risk:high` | **discuss and wait** — after reading the body, before changing state, editing files, or committing | **wait for confirmation** |
+| `risk:medium` | **tell, don't wait** | no pause — report it, then mark done |
 | `risk:low` | no | no — mark it done yourself once the gate below passes |
 
-- **Pausing means: stop the turn, say what you are about to do and why it needs a yes, and write nothing.** Continue only on an explicit confirmation from the user ("确认", "可以", "go ahead"). No reply, or a reply about something else, is **not** a confirmation — answer it if asked, and keep waiting.
+- **`risk:medium` — tell the user, never wait.** When starting, say in one line that this is a `medium` item and which places it touches, then keep going in the same turn. In the final report, list it separately: the item, the files changed, and how to undo it (`git revert <commit>`). Then mark it done yourself. Reason: medium is undone cleanly by `git revert`, so the user needs to know it happened, not to approve it.
+- **`risk:high` — discuss before any write.** Lay out the plan, the places it will change, how a mistake would show up, how it would be undone, and every open point the user should decide. Then stop the turn and write nothing. Reason: a high change cannot be cleanly undone, so the user should shape it, not just approve it.
+  - If the user proposes changes, revise the plan, lay it out again, and keep waiting — **a proposed change is not consent**.
+  - Start only on an explicit go-ahead ("确认", "可以", "go ahead"). No reply, or a reply about something else, is **not** a go-ahead — answer it if asked, and keep waiting.
+  - If the discussion changed the item's `涉及范围`, `完成标准`, or `回退`, first update the body to the agreed version (write-workitem's "Editing an Existing Body"), then start. Reason: the verification record is checked against the body; an outdated body makes the agreed work look out of scope.
+- **Waiting for confirmation** (high, before marking done): stop the turn and write nothing; the same explicit go-ahead rule applies.
 - **No risk Label, or more than one** → treat as `high`, and ask the user which level it should be. A Label whose name is not exactly one of the three does not count.
 - **Label and the first word of `风险` disagree** → treat as the **higher** of the two, and ask which one is right.
 - **`high` without a `回退` block** → do not start; ask the user how it would be undone.
-- The pause before marking done comes **after** the verification record is posted (see "The Gate"). Reason: the user should be confirming something that has already been verified.
+- The `high` pause before marking done comes **after** the verification record is posted (see "The Gate"). Reason: the user should be confirming something that has already been verified.
 
 ### Set State Before Starting
 
@@ -158,7 +163,7 @@ It prints HTML: the current HEAD; every commit whose message has the whole line 
 #### The Gate
 
 - **No verification-record comment → do not move the item to the `completed` group.** This holds even when the user asks to skip it; say why and stop.
-- **Then the risk pause**: `risk:high` and `risk:medium` stop here and wait for an explicit confirmation before moving to `completed`; `risk:low` proceeds.
+- **Then the risk pause**: `risk:high` stops here and waits for an explicit confirmation before moving to `completed`; `risk:medium` and `risk:low` proceed (medium is still listed in the final report).
 - **A file outside `涉及范围` whose reason you cannot state → do not mark done; ask the user.**
 - **Re-check the version just before marking done.** Run `git rev-parse --short HEAD` again; if it differs from the version in the record, the code changed after verification — run the V steps again and post a new record.
 - **A failed run is recorded too**, with verdict `失败`, and the item stays open.

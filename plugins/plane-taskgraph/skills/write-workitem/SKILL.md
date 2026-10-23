@@ -92,7 +92,7 @@ The first word is the level. Then list **each** distinct failure symptom — wha
 | `medium` | Changes user-visible behaviour or core logic, but `git revert` undoes it cleanly |
 | `low` | Changes no behaviour: docs, comments, tests, features behind a disabled flag, internal scripts |
 
-Rate the item by the **most dangerous** place listed in `涉及范围`. When unsure, go one level higher: rating too low means it ships with nobody looking; rating too high costs one extra pause.
+Rate the item by the **most dangerous** place listed in `涉及范围`. When unsure, go one level higher: rating too low means an irreversible change ships without being discussed; rating too high costs one discussion.
 
 **Every symptom listed in 风险 must be covered by at least one V item.** A risk that is written down but never checked is decoration.
 

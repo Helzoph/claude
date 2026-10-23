@@ -73,12 +73,15 @@ goes stale, piles up, and stops telling anyone anything. An item that touches
 two areas is attached to both, so neither area's read-back misses it.
 
 **Risk is a Label, and it changes what the agent does.** `risk:high` (hard to
-undo, or reaches outside the repo) pauses before any write and again before
-marking done, and cannot start without a `回退` block. `risk:medium` pauses once,
-before marking done. `risk:low` runs through on its own. A missing Label, two
-Labels, or a Label that disagrees with the body's 风险 paragraph is treated as
-the higher level, and the agent asks. Only an explicit "yes" counts as
-confirmation — an unrelated reply does not.
+undo, or reaches outside the repo) stops before any write to discuss the plan
+with you — what changes, how it could fail, how to undo it — and waits again
+before marking done; it cannot start without a `回退` block. `risk:medium`
+(undone cleanly by `git revert`) never waits: the agent says so when it starts
+and lists the item, its files and its revert command in the final report.
+`risk:low` runs through on its own. A missing Label, two Labels, or a Label that
+disagrees with the body's 风险 paragraph is treated as the higher level, and the
+agent asks. Only an explicit "yes" counts as a go-ahead — an unrelated reply or
+a counter-proposal does not.
 
 **No verification record, no "done".** Before an item may move to the
 `completed` group, the agent posts one comment with four blocks: the verdict
