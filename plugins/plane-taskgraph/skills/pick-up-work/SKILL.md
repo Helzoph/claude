@@ -146,6 +146,8 @@ After running the item's `验证` steps, post **one** comment (`workitem_comment
 | `已执行` | Per V number from the body: the command, exit code, and the key output lines. For an e2e run through `claude -p`, also its `session_id`; other e2e entries (a CLI, `curl`, a browser run) have none, so do not write one. |
 | `未验证` | V numbers that were not run, each with the reason. Write `无` if all ran. |
 
+Send the whole comment as **one line**, with nothing between a closing `>` and the next `<` — the same rule as an item body (write-workitem's "HTML Format"). Reason: newlines between tags turn into empty bullets once the comment is saved from the web editor.
+
 #### Generating `改动文件`
 
 Run, inside the target repository (`<skill dir>` is the "Base directory for this skill" shown when this skill loaded):
@@ -154,7 +156,7 @@ Run, inside the target repository (`<skill dir>` is the "Base directory for this
 bash "<skill dir>/scripts/changed-files.sh" <ITEM-ID> [ignored-path ...]
 ```
 
-It prints HTML: the current HEAD; every commit whose message has the whole line `Refs: <ITEM-ID>` (so `FMTLAB-1` never matches `FMTLAB-12`) with its `--name-status`; the union of their files; and `git status --porcelain`. Paths are HTML-escaped.
+It prints HTML: the current HEAD; every commit whose message has the whole line `Refs: <ITEM-ID>` (so `FMTLAB-1` never matches `FMTLAB-12`) with its `--name-status`; the union of their files; and `git status --porcelain`. Paths are HTML-escaped, and the output is a single line so it can be spliced into the comment as-is.
 
 - **Never write or edit this block by hand.** Reason: a hand-written list drops files, adds files, and nobody can tell it disagrees with the real commits.
 - If the script exits non-zero with `no commit has trailer`, the commits are missing the trailer. Fix that (amend locally, or commit the work with the trailer) — do not post an empty list, which reads as "nothing changed".

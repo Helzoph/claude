@@ -38,26 +38,32 @@ for f in "$@"; do
 done
 ignored="${ignored%$'\n'}"
 
-echo "<p>HEAD：<code>$(gitq rev-parse --short HEAD)</code></p>"
-echo "<p>提交</p><ul>"
-for c in $commits; do
-  echo "<li><code>$(gitq log -1 --format='%h %s' "$c" | esc)</code><ul>"
-  gitq show --name-status --format= "$c" | tr '\t' ' ' | li
-  echo "</ul></li>"
-done
-echo "</ul>"
-
-echo "<p>文件并集</p><ul>"
-gitq log --grep="^Refs: ${id}\$" --name-only --format= | sed '/^$/d' | sort -u | li
-echo "</ul>"
-
-echo "<p>未提交改动（git status --porcelain）</p><ul>"
-dirty=$(gitq status --porcelain)
-if [ -z "$dirty" ]; then echo "<li>无</li>"; else printf '%s\n' "$dirty" | li; fi
-echo "</ul>"
-
-if [ -n "$ignored" ]; then
-  echo "<p>git 看不到的改动（git check-ignore -v）</p><ul>"
-  printf '%s\n' "$ignored" | tr '\t' ' ' | li
+# One line, no whitespace between tags: Plane's web editor turns every
+# newline between two tags into an empty paragraph or bullet when the
+# comment is next saved from the browser.
+{
+  echo "<p>HEAD：<code>$(gitq rev-parse --short HEAD)</code></p>"
+  echo "<p>提交</p><ul>"
+  for c in $commits; do
+    echo "<li><code>$(gitq log -1 --format='%h %s' "$c" | esc)</code><ul>"
+    gitq show --name-status --format= "$c" | tr '\t' ' ' | li
+    echo "</ul></li>"
+  done
   echo "</ul>"
-fi
+
+  echo "<p>文件并集</p><ul>"
+  gitq log --grep="^Refs: ${id}\$" --name-only --format= | sed '/^$/d' | sort -u | li
+  echo "</ul>"
+
+  echo "<p>未提交改动（git status --porcelain）</p><ul>"
+  dirty=$(gitq status --porcelain)
+  if [ -z "$dirty" ]; then echo "<li>无</li>"; else printf '%s\n' "$dirty" | li; fi
+  echo "</ul>"
+
+  if [ -n "$ignored" ]; then
+    echo "<p>git 看不到的改动（git check-ignore -v）</p><ul>"
+    printf '%s\n' "$ignored" | tr '\t' ' ' | li
+    echo "</ul>"
+  fi
+} | tr -d '\n'
+echo

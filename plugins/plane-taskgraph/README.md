@@ -52,8 +52,8 @@ like a correct one. Computed from the graph (unfinished items whose
 ### Script
 
 `skills/pick-up-work/scripts/changed-files.sh <ITEM-ID> [ignored-path ...]`
-prints the "changed files" block of a verification record as HTML, straight
-from git: every commit whose message carries the trailer line
+prints the "changed files" block of a verification record as one line of
+HTML, straight from git: every commit whose message carries the trailer line
 `Refs: <ITEM-ID>`, each commit's `--name-status`, the union of files, and
 `git status --porcelain`. Gitignored files the item touched can be passed as
 extra arguments; they are listed with their `git check-ignore -v` line as
@@ -138,6 +138,10 @@ returns HTTP 200 and stores or reports wrong data:
 - **`description_html` takes raw HTML.** Escaped entities (`&lt;p&gt;`) are
   stored verbatim and render as literal tags. A Module's description, by
   contrast, is plain text only — HTML passed there is shown literally.
+- **Whitespace between HTML tags becomes empty bullets.** Plane stores the
+  newlines and indentation between tags verbatim; once the item is saved from
+  the web editor, each gap turns into an empty `<li>` or `<p>`. Bodies and
+  comments are sent as one line, and `changed-files.sh` prints one line.
 - **New work items default to the `backlog` group**, not `unstarted`. So
   `backlog` does not mean "not yet planned" — only `completed` and `cancelled`
   may be filtered out when computing what's available.

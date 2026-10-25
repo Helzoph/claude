@@ -33,6 +33,8 @@ Blocks appear in this order. The first five are **required**; the last three are
 | `回退` | no (required for `high`) | Exact steps to undo, and what cannot be undone |
 | `注意` | no | Known traps and decisions already made, each with `原因：` |
 
+The template is indented here only to be readable. **Send it as one line** — see HTML Format.
+
 ```html
 <h3>为什么</h3>
 <p>…</p>
@@ -198,6 +200,7 @@ Which Module it belongs to, what it depends on, and what state it is in. Each ha
 - `h3` is used only for block names. No `h1`–`h6` inside blocks.
 - Allowed tags: `h3`, `p`, `strong`, `ul`, `li`, `code`. Nothing else has been verified to survive the Plane editor.
 - Write tags as raw HTML. In text, write `<`, `>`, `&` as `&lt;`, `&gt;`, `&amp;`.
+- **Write the whole body as one line, with nothing between a closing `>` and the next `<`.** Plane stores the newlines and indentation between tags as text; the next time anyone saves the item from the web editor, each of those gaps becomes an empty bullet or empty paragraph — every real bullet ends up sandwiched between blank ones.
 - Read back with `description_html`, never `description_stripped` — stripping removes the `h3` tags and the blocks become indistinguishable lines.
 - A body that has been saved from the Plane web editor comes back with attributes on every element (`<h3 class="editor-heading-block" data-id="…">`) and without the outer `<div>`. Match tags with patterns that allow attributes, e.g. `<h3[^>]*>`.
 
@@ -220,4 +223,4 @@ Which Module it belongs to, what it depends on, and what state it is in. Each ha
 
 ## After Writing
 
-Read the item back (`description_html`) and check: the `h3` sequence is 为什么, 涉及范围, 风险, 完成标准, 验证, then only 不做 / 回退 / 注意; every C and V is numbered; at least one V is e2e (or `e2e：不适用` with a reason); no U+FFFD; exactly one `risk:*` Label, matching the first word of 风险. For a new item, also confirm it is attached to its Module(s). Then report the item's identifier, title, risk Label, and Module(s) to the user.
+Read the item back (`description_html`) and check: the `h3` sequence is 为什么, 涉及范围, 风险, 完成标准, 验证, then only 不做 / 回退 / 注意; every C and V is numbered; at least one V is e2e (or `e2e：不适用` with a reason); no whitespace between tags (`>\s+<` matches nothing); no U+FFFD; exactly one `risk:*` Label, matching the first word of 风险. For a new item, also confirm it is attached to its Module(s). Then report the item's identifier, title, risk Label, and Module(s) to the user.
