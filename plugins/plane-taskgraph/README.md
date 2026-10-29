@@ -44,10 +44,10 @@ like a correct one. Computed from the graph (unfinished items whose
 
 | Skill | Triggers on | What it does |
 |---|---|---|
-| [`write-workitem`](skills/write-workitem/SKILL.md) | filing or editing a single item, "rate the risk of ABC-3" | The source of truth for an item body: the `h3` template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证, plus optional 不做 / 回退 / 注意), the `risk:*` Label rules, and how e2e checks are written so the agent can run them headless |
+| [`write-workitem`](skills/write-workitem/SKILL.md) | filing or editing a single item, "rate the risk of ABC-3", "add this decision to ABC-3", "this item depends on ABC-2" | The source of truth for an item body: the `h3` template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证, plus optional 不做 / 回退 / 注意), the `risk:*` Label rules, a variant for design / spike items, dependencies as `blocked_by` relations (never prose), and how e2e checks are written so the agent can run them headless. Format rules and the e2e recipe live in `references/` |
 | [`write-module`](skills/write-module/SKILL.md) | "which module does this go in", "create a module for X" | Maps an item onto existing functional Modules (attaching it to every one it touches); creates a new Module only after you agree, with a plain-text description template |
 | [`plan-to-plane`](skills/plan-to-plane/SKILL.md) | "record this into Plane", "break this into work items" | Orchestrates the two above for a whole design, then **wires the `blocked_by` relations** as a separate mandatory step and lists every relation back to you |
-| [`pick-up-work`](skills/pick-up-work/SKILL.md) | "what can I work on next", "do ABC-12", "is the X module done?" | Computes what can start now; does an item — reads the body, pauses according to its risk Label, commits with a `Refs: ABC-12` trailer, posts a verification-record comment, and only then marks it done |
+| [`pick-up-work`](skills/pick-up-work/SKILL.md) | "what can I work on next", "do ABC-12", "is the X module done?" | Computes what can start now; does an item as an eight-step checklist — reads the body, moves it to a started state, pauses according to its risk Label, commits with a `Refs: ABC-12` trailer, posts a verification-record comment, and only then marks it done and reads the state back |
 
 ### Script
 
@@ -58,6 +58,36 @@ HTML, straight from git: every commit whose message carries the trailer line
 `git status --porcelain`. Gitignored files the item touched can be passed as
 extra arguments; they are listed with their `git check-ignore -v` line as
 evidence, and a path that is not actually ignored is refused.
+
+### Hooks
+
+`hooks/hooks.json` registers two guards. Both are plain bash + `jq` and fail
+open: if `jq` is missing or the input does not parse, they say nothing and let
+the call through.
+
+- **`check-workitem-body.sh`** (`PreToolUse` on the plugin's Plane `workitem`
+  tool, `create` / `update` only). It **rejects** the call — Claude sees the
+  reason and retries — when the body would break read-back: whitespace or a
+  newline next to a block tag, `h3` blocks missing, renamed (`涉及范围（摸底）`),
+  invented or out of order, or a body sent only as `description_stripped`. It
+  **warns without blocking** when the title or body contains something that
+  looks like a work item identifier (`见 ABC-12`) or a numbered step (`第二步`),
+  pointing at `blocked_by` instead; identifiers such as `UTF-8` also match, so
+  this stays a note, not a rejection.
+- **`remind-state-update.sh`** (`Stop`). If the current turn ran a `git commit`
+  whose message carries a `Refs: <ITEM-ID>` trailer, but after the last such
+  commit it neither posted a comment nor changed the item's state, it holds the
+  turn open once and names what is missing. It fires at most once per stop
+  (`stop_hook_active`), so an item left open on purpose costs one sentence.
+
+The skills already state these rules. The hooks exist because edits made
+without loading a skill never see them, and the end-of-turn state update is
+the step most often dropped. They only reject what is mechanically certain to
+be wrong; a guard that blocks too much gets switched off entirely.
+
+Known limits: a commit made with `git commit -F <file>` has no visible trailer
+and is not seen by the Stop hook; a body that is not in the template (an epic
+written by hand, say) is rejected on update until it is converted.
 
 ### MCP server
 
@@ -96,6 +126,23 @@ assertions on the stream-json output (plugin loaded from the repo, the expected
 skill fired, no error, zero permission denials), plus read-backs of Plane
 fields. "The agent stopped" is judged by state — git HEAD, the item's
 `updated_at`, its comment count — never by what the reply says.
+
+**Order lives in relations, never in text.** `见 ABC-12`, `等 ABC-12 做完`,
+"第二步" in a title, a `[Module]` prefix, or "已完成" in the body all restate
+something Plane already models — and the copy in prose is the one that goes
+stale, because nothing reads it. Every ordering is a `blocked_by` relation
+created from the blocked item; a pure "see also" is the `relates to` relation.
+
+**Design items use the same template.** A spike or design item gets one
+完成标准 per question it must answer and 验证 entries that check the written
+decision; its e2e line says why it does not apply. Decisions reached while an
+item is open go into 注意 as `已定（YYYY-MM-DD）：… 原因：…`, not into 为什么.
+
+**State is part of doing the item.** The item moves to a `started` state
+before the first file is touched and to a `completed` state only after the
+record is posted — then the state is read back, because the update response
+lies (see below). The final report quotes that read-back state; a report
+without it means the step was skipped.
 
 **No separate sign-off item.** A check that spans several items goes into the
 验证 of the most-downstream item of the chain, next to the change it checks.

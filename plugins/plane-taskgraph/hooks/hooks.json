@@ -1,0 +1,28 @@
+{
+  "description": "plane-taskgraph guards: reject Plane work item bodies that break the h3 template or the one-line HTML rule, note dependencies written as prose, and remind once at the end of a turn that committed item work without updating the item's state.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__plugin_plane-taskgraph_plane__workitem",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/check-workitem-body.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/remind-state-update.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

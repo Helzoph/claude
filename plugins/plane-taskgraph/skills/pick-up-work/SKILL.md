@@ -1,6 +1,6 @@
 ---
 name: pick-up-work
-description: "Answer or act on any request about work already in Plane — what can start now, doing an item, changing an item's state or marking it done ('把 ABC-12 标完成', 'close ABC-12'), or status questions ('is the X module done?', 'X 模块做完了吗', 'X 的进度') — instead of calling the Plane tools directly. Reads a task graph back from Plane and computes which work items can start right now, by checking whether each item's blocked_by dependencies are all done; then do an item — read its body (current h3 or old strong-heading format), pause for the user according to its risk:* Label, commit with a `Refs: <ITEM-ID>` trailer, post a verification-record comment whose changed-files block is generated from git by a bundled script, and only then mark it done. Use this skill when picking up work already recorded in Plane — triggers on 'implement the xxx feature', 'do ABC-12', 'what can I work on next', 'what's unblocked'. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane) or for writing an item body (use write-workitem)."
+description: "Answer or act on any request about work already in Plane — what can start now, doing an item, changing an item's state or marking it done ('把 ABC-12 标完成', 'close ABC-12'), or status questions ('is the X module done?', 'X 模块做完了吗', 'X 的进度') — instead of calling the Plane tools directly. Reads a task graph back from Plane and computes which work items can start right now, by checking whether each item's blocked_by dependencies are all done; then do an item — read its body (current h3 or old strong-heading format), move it to a started state before the first edit, pause for the user according to its risk:* Label, commit with a `Refs: <ITEM-ID>` trailer, post a verification-record comment whose changed-files block is generated from git by a bundled script, and only then mark it done and read the state back. Use this skill when picking up work already recorded in Plane — triggers on 'implement the xxx feature', 'do ABC-12', 'what can I work on next', 'what's unblocked', 'I finished ABC-12', 'ABC-12 做完了', and whenever code was just committed for an item that Plane still shows as not done. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane) or for writing an item body (use write-workitem)."
 ---
 
 # Read the Task Graph Back From Plane and Compute What Can Start Now
@@ -61,7 +61,18 @@ Items whose `blocked_by` entries are all done (or that have no `blocked_by` at a
 
 ## Doing an Item
 
-Steps 1–5 answer "what can start". When the user asks to actually do an item, go through the sections below in order: read the body, check the risk level, start, commit, record, pass the gate, mark done.
+Steps 1–5 answer "what can start". When the user asks to actually do an item, go through these steps in order. Two of them are state writes, and they are the steps most often forgotten — the code gets written, the turn ends, and Plane still says `backlog`. Reason: the board is the only place anyone else (the user, the next agent, `pick-up-work` itself) learns that an item started or finished; a forgotten state write makes the next parallel set wrong.
+
+1. Read the body ("Read the Body").
+2. Check the risk level and pause if it says so ("Risk Level: When to Pause").
+3. **State → `started`** ("Set State Before Starting"). Before the first file edit.
+4. Implement; every commit carries `Refs: <ITEM-ID>` ("Commits").
+5. Run the `验证` steps and post the verification record ("Verification Record").
+6. Pass the gate ("The Gate").
+7. **State → `completed`, then read it back** ("Mark Done"). Or, if the gate did not pass, leave it `started` and say why.
+8. Report, including the state read back in step 7 ("Report to the User").
+
+The turn that does an item is not finished until step 7 has run or the report says why it did not. If the work spans several turns, state is set in the turn that starts the work and in the turn that finishes it — not left for "later".
 
 ### Read the Body
 
@@ -121,7 +132,7 @@ The level comes from the item's Label — exactly one of `risk:high` / `risk:med
 workitem(action="update", workitem_id=..., state=<UUID of a state in the started group>)
 ```
 
-First run `state(action="list")` to get the UUID of a state whose group is `started` in that project. For `risk:high`, this is a write — it comes after the first confirmation.
+First run `state(action="list")` to get the UUID of a state whose group is `started` in that project — and, in the same call, the UUID of a `completed`-group state for "Mark Done", so the last step needs no lookup. For `risk:high`, this is a write — it comes after the first confirmation. For `medium` and `low`, it is the first write, before any file edit.
 
 ⚠️ **The `state_group` in `update`'s response is stale** — after changing to Done, the response's `state` and `completed_at` are updated but `state_group` is still the old value. To double-check, `list` again. Trust it and a just-finished item is treated as unfinished, **so the next parallel-set computation comes up short**.
 
@@ -172,6 +183,23 @@ It prints HTML: the current HEAD; every commit whose message has the whole line 
 - **Only ever append comments; never edit or delete an earlier one.** Earlier records are the history; an edited record makes a past failure disappear.
 - Long logs go into `workitem_attachment` or `workitem_link`; the comment keeps the few lines that show the result. Reason: nobody reads a comment that is mostly log.
 
+### Mark Done
+
+Once the gate passes (and, for `risk:high`, the user confirmed):
+
+```
+workitem(action="update", project_id=..., workitem_id=..., state=<UUID of a completed-group state>)
+workitem(action="list", project_id=..., pql='id = "<ITEM-ID>"', fields='id,sequence_id,state_group')
+```
+
+PQL's `id` takes the human identifier (`"ABC-12"`), not the UUID.
+
+The `list` is required: `update`'s response carries a stale `state_group`, so only the `list` result proves the move happened. Quote that `state_group` in the report.
+
+If the gate did **not** pass (a failed V, a file outside `涉及范围` without a reason, the user not yet confirming a `high` item), the item stays in `started`. Do not move it back to `backlog` / `unstarted`. Say in the report which gate condition is open. Reason: `started` is the truth — work exists — and the record comment already says what failed.
+
+When the user changes their mind about an item mid-way ("don't do this after all"), ask whether it should go to `cancelled`; do not leave it `started` with nobody working on it.
+
 ## Judge Completion by State Group, Never by State Name
 
 There are exactly five groups: `backlog` / `unstarted` / `started` / `completed` / `cancelled`. **State names can be changed freely; groups cannot**, so judgments can only be based on the group.
@@ -189,3 +217,5 @@ If no Module has that name, say so and list the project's Modules; do not guess 
 List the batch that can start in parallel (identifier + title + risk Label), and **what each blocked item is waiting on**. The latter matters just as much — only by seeing "what is being waited on" can the user judge whether to adjust priorities.
 
 After dependencies change (one item finished, or a new dependency added), **recompute** — do not reuse the previous result.
+
+After doing an item, the report also states, per item: its state as read back by `list` in "Mark Done" (`state_group: completed`, or `started` plus the open gate condition), the commit(s), and the verification verdict. A report without the read-back state means step 7 was skipped — go back and run it.

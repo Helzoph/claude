@@ -1,6 +1,6 @@
 ---
 name: write-workitem
-description: "Write or edit the body of a single Plane work item: the fixed h3 template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证 / 不做 / 回退 / 注意), numbered completion criteria C1..Cn, numbered verification steps V1..Vn with an agent-run e2e, and a risk level. Use this skill whenever one work item's description is being created or changed — triggers on 'record a bug in Plane', 'add a work item', 'file an issue for this', 'write up this task', 'make this item's criteria more specific', and whenever plan-to-plane or pick-up-work needs to write or patch an item body. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for deciding which Module an item belongs to (use write-module) or for computing what can start next (use pick-up-work)."
+description: "Write or edit the body or title of a single Plane work item: the fixed h3 template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证 / 不做 / 回退 / 注意), numbered completion criteria C1..Cn, numbered verification steps V1..Vn with an agent-run e2e, a risk level, and the item's blocked_by dependencies. Use this skill whenever one work item's description or title is being created or changed — triggers on 'record a bug in Plane', 'add a work item', 'file an issue for this', 'write up this task', 'make this item's criteria more specific', 'add this decision to ABC-3', 'update ABC-3', 'fix the format of ABC-3', 'this item depends on ABC-2', and whenever plan-to-plane or pick-up-work needs to write or patch an item body. Also covers design / spike items whose output is a decision rather than code. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for deciding which Module an item belongs to (use write-module) or for computing what can start next (use pick-up-work)."
 ---
 
 # Write a Plane Work Item Body
@@ -9,18 +9,39 @@ A work item body is read back later by an agent that has none of today's context
 
 The block names and sub-labels below are Chinese literals written into Plane. Keep them in Chinese exactly as shown: people read them in the Plane UI, and `pick-up-work` matches them verbatim on read-back. Write the prose inside the blocks in the user's language.
 
+Before sending any `description_html`, read `references/plane-html.md` (one-line HTML, allowed tags, and the failures that return HTTP 200 with wrong data).
+
+## Never Put These in the Title or Body
+
+Three facts have structured fields. Writing them as prose is the most common way this workflow breaks:
+
+| Fact | Its field | Forms that are forbidden in title and body |
+|---|---|---|
+| What must finish first | `blocked_by` relation | `见 ABC-12`, `等 ABC-12 做完`, `依赖 ABC-12`, `ABC-12 已经开了这个口子的话…`, `第二步` / `第 3 步` / `Part 2` in the title |
+| Which functional area | Module | `属于 X 模块`, `[X]` prefixes in the title |
+| Whether it is done | state | `已完成`, `进行中`, `TODO` |
+
+Reason: `pick-up-work` computes what can start **only** from `blocked_by`. An order written as "第二步" in a title, or as "见 ABC-12" in a body, is invisible to it — the item is offered as ready while the thing it waits on is still open. And a second copy in prose drifts: when the two disagree, nobody knows which is true.
+
+- **An order between items is a `blocked_by` relation**, created as described in "Creating a New Item" step 4 — never a numbered title. If the title would only make sense with a step number, name what the step delivers instead.
+- **"See also" without an order** is the custom relation `relates to` (see plan-to-plane, "Dependencies"), not an identifier in prose.
+- **Shared context between items** ("the mount point decided in another item") is restated in this item's own words, so it reads alone. If it cannot be restated without the other item's details, that is a `blocked_by`.
+
 ## Creating a New Item
 
 1. **Pick the Module(s) first** — invoke the `plane-taskgraph:write-module` skill and follow its "Attaching an Item" rules against the places this item will list in `涉及范围`. If no existing Module fits, write-module says to stop and ask: do that **before** creating the item. Reason: an item created without a Module is invisible to anyone reading the board by Module, and `pick-up-work` never offers it.
 2. Write the body per this skill, then `workitem(action="create", labels=[<the one risk:* label id>])` — see "The Risk Label".
 3. Attach it to every Module chosen in step 1 (`module(action="manage_workitems")`) and read back, as write-module describes.
-4. Run "After Writing" below.
+4. **Dependencies.** Ask yourself — and the user, if the conversation did not settle it — which existing items must be finished before this one can start. For each, from **this** (the blocked) item: `workitem_relation(action="create", project_id=..., workitem_id=<this item>, workitem_ids=[<blocker ids>], relation_type="blocked_by")`. Then `workitem_relation(action="list", workitem_id=<this item>)` and confirm every blocker appears under `dependencies.blocked_by`. If nothing blocks it, say so in the report ("无 blocked_by") so the absence is a decision, not an omission.
+5. Run "After Writing" below.
 
-Skipping step 3 is the common failure: the item exists, looks complete, and is attached to nothing.
+Skipping step 3 or 4 is the common failure: the item exists, looks complete, and is attached to nothing / waits on nothing.
+
+When several items with an order between them are being filed together, use `plan-to-plane` instead — it creates all items first and wires every relation afterwards.
 
 ## The Template
 
-Blocks appear in this order. The first five are **required**; the last three are optional and are **deleted entirely** (heading included) when empty — an empty heading reads as "someone forgot", not "nothing to say".
+Blocks appear in this order. The first five are **required**; the last three are optional and are **deleted entirely** (heading included) when empty — an empty heading reads as "someone forgot", not "nothing to say". **No other `h3` is allowed**, and block names carry no suffix: `涉及范围（初步）` is not `涉及范围`. Reason: `pick-up-work` and the bundled hook match the names exactly; an invented block is content nobody reads back.
 
 | Block | Required | What goes in it |
 |---|---|---|
@@ -31,9 +52,9 @@ Blocks appear in this order. The first five are **required**; the last three are
 | `验证` | yes | Numbered checks V1..Vn that prove the C items |
 | `不做` | no | Things deliberately left out, each with `原因：` |
 | `回退` | no (required for `high`) | Exact steps to undo, and what cannot be undone |
-| `注意` | no | Known traps and decisions already made, each with `原因：` |
+| `注意` | no | Known traps, and decisions already made, each with `原因：` |
 
-The template is indented here only to be readable. **Send it as one line** — see HTML Format.
+The template is indented here only to be readable. **Send it as one line** — see `references/plane-html.md`.
 
 ```html
 <h3>为什么</h3>
@@ -76,6 +97,7 @@ The template is indented here only to be readable. **Send it as one line** — s
 </ul>
 <h3>注意</h3>
 <ul>
+  <li>已定（2026-10-29）：… 原因：…</li>
   <li>… 原因：…</li>
 </ul>
 ```
@@ -84,9 +106,13 @@ The template is indented here only to be readable. **Send it as one line** — s
 
 A bare "touch `client.ts`" or "don't do auto-refresh" cannot be re-evaluated later: when circumstances change, nobody knows whether the rule still holds. Write the reason inline after the literal `原因：` so it can be found mechanically.
 
+### Decisions Go in 注意, Dated
+
+A decision made while discussing the item ("use a sidecar, not a shared volume") is one `注意` entry starting with the literal `已定（YYYY-MM-DD）：`, followed by `原因：`. Not a paragraph in `为什么`, not a new `h3`. Reason: one fixed place means a later reader finds every decision by searching `已定`, and the date shows which decisions predate a change in circumstances.
+
 ### 风险
 
-The first word is the level. Then list **each** distinct failure symptom — what the user or the next agent would actually see — and how to undo the change.
+The first word is the level. Then list **each** distinct failure symptom — what the user or the next agent would actually see — and how to undo the change. A risk mentioned only in `注意` is not written down: `风险` is what V items are checked against.
 
 | Level | Criteria |
 |---|---|
@@ -115,7 +141,7 @@ risk:high    risk:medium    risk:low
 
 ### 完成标准
 
-Numbered `C1`, `C2`, … continuously across the whole block, grouped under up to three literal group labels: `主流程` / `边界与异常` / `不能变的`. Drop a group that has nothing in it.
+Numbered `C1`, `C2`, … continuously across the whole block, in order, grouped under up to three literal group labels: `主流程` / `边界与异常` / `不能变的`. Drop a group that has nothing in it. When adding a C to an existing item, put it in its group and **renumber**, updating every `覆盖` that pointed at a shifted number. Reason: `C12` sitting between `C3` and `C4` makes a gap look like a missing criterion.
 
 Each C is a behaviour someone can observe — an output, a state, a file content, a UI element — not an activity ("implement X", "refactor Y"). Numbers exist so every V can say which C it covers, and gaps become visible.
 
@@ -140,39 +166,13 @@ Three types, and only three:
 | 单元 | Runs one function or script in isolation |
 | e2e | Enters through the real entry point and reads back the real result |
 
-**At least one e2e is required whenever 完成标准 contains behaviour, and it must cover the main C.** Checks and units prove the parts are right; only e2e proves the outcome the user asked for actually appears. When the change truly has no behaviour (documentation only), write one V as `e2e：不适用。原因：…`.
+**At least one e2e is required whenever 完成标准 contains behaviour, and it must cover the main C.** Checks and units prove the parts are right; only e2e proves the outcome the user asked for actually appears. When the change truly has no behaviour (documentation only, or a design item below), write one V as `e2e：不适用。原因：…`.
 
 #### e2e Is Run by the Agent
 
 Every e2e step is executed by the agent itself — including any step where "the user replies", which the agent plays. **Never write `（手动）` or a step that needs a human to run it**: a step that needs a human does not get run, and ends up in "未验证" while the item is marked done anyway.
 
-Each e2e states its entry command, its input, how the result is read back, and the expected value. Pick the entry by what changed:
-
-- **A skill or plugin**: run Claude Code headless against the plugin directory in the repo, then assert on the transcript with jq:
-
-  ```bash
-  P="$(git rev-parse --show-toplevel)/plugins/<plugin>"
-  claude -p "<prompt>" --plugin-dir "$P" \
-    --output-format stream-json --verbose --max-budget-usd 3 \
-    --allowedTools <tools this run needs> > /tmp/<item>-<V>-<round>.jsonl
-  ```
-
-  To play the user's reply, run the same command with `--resume <session_id>` from the previous round. Every round passes four generic assertions (F is that round's jsonl):
-
-  - The repo copy of the plugin was loaded: `jq -r 'select(.subtype=="init") | .plugins[] | select(.name=="<plugin>") | .source + " " + .version' F` prints `<plugin>@inline` and the version in plugin.json. Reason: with a marketplace install present, a stale cached copy can be tested instead.
-  - Which skills fired: `jq -r 'select(.type=="assistant").message.content[] | select(.type=="tool_use" and .name=="Skill") | .input.skill' F`.
-  - Which tools ran: `jq -c 'select(.type=="assistant").message.content[] | select(.type=="tool_use") | [.name, (.input.skill // .input.action)]' F`.
-  - How it ended: `jq -c 'select(.type=="result") | [.is_error, (.permission_denials | length), .session_id]' F` — the first two must be `false` and `0`. Reason: a denied tool makes the agent stop or skip steps in a way that looks identical to correct behaviour.
-
-  macOS has no `timeout`; bound a run with `--max-budget-usd`, not by wrapping it.
-
-- **A web page**: browser automation — a Playwright spec, or agent-browser.
-- **An HTTP endpoint**: `curl`, asserting on status and body.
-- **A command-line tool**: run it directly.
-
-#### "The Agent Stopped" Is Judged by State, Not Words
-
-When a V expects the agent to pause (wait for confirmation, ask a question), check that **nothing was written**: `git rev-parse HEAD` and `git status --porcelain` unchanged, and the Plane item's `updated_at` and comment count unchanged. The reply text is supporting evidence only — "let me pause here" says nothing about what was already written before it.
+How to write the entry command and assertions — headless `claude -p --plugin-dir` for a skill or plugin, browser automation, `curl`, a CLI — and how to judge "the agent stopped" by state rather than words: `references/e2e-recipe.md`. Read it before writing any e2e V.
 
 #### 人工检查
 
@@ -182,11 +182,19 @@ Only for what genuinely needs human eyes — whether a page reads well, whether 
 
 - `不做`: scope that was considered and deliberately excluded. Writing it down is what lets a later "should this also…" be answered without re-litigating.
 - `回退`: required when the level is `high`. If you cannot write how to undo a `high` change, stop and ask the user before creating the item.
-- `注意`: traps and constraints the implementer would otherwise hit.
+- `注意`: traps and constraints the implementer would otherwise hit, and dated decisions (see "Decisions Go in 注意, Dated").
 
-## Never Put These in the Body
+## Design / Spike Items
 
-Which Module it belongs to, what it depends on, and what state it is in. Each has a structured field (Module, `blocked_by` relation, state). A second copy in prose drifts, and when the two disagree nobody knows which is true.
+An item whose output is a decision ("decide how plugins mount their config"), not code, uses the **same eight blocks** — no `已定下的` / `要回答的问题` headings. Map it like this:
+
+- `涉及范围`: the places the decision will affect, each with `原因：`. If this is still a guess, say so in the entry ("待摸底") — do not put the caveat in the heading.
+- `完成标准`: one C per question that must be answered — `C1：「plugins 的配置挂在哪」有结论，写进 <doc path or this item's 注意>`. A question is a C; its answer is not.
+- `验证`: `检查` V items that find each conclusion where C says it is written (e.g. a `ugrep` on the doc with a positive control), plus `e2e：不适用。原因：产出是决定，不是行为`.
+- `风险`: usually `low` (nothing ships). Rate higher only if the decision is acted on inside this item.
+- Decisions already reached before the item is done go in `注意` as `已定（YYYY-MM-DD）：…`, like any other item.
+
+The items that implement the decision are separate items with `blocked_by` this one.
 
 ## Sizing an Item
 
@@ -195,32 +203,25 @@ Which Module it belongs to, what it depends on, and what state it is in. Each ha
 - No line-count limit. Lines changed do not track risk.
 - An integration check that spans items goes into the **most-downstream** item of the dependency chain. If no item sits downstream of all the parts, stop and ask the user — the split is probably wrong.
 
-## HTML Format
-
-- `h3` is used only for block names. No `h1`–`h6` inside blocks.
-- Allowed tags: `h3`, `p`, `strong`, `ul`, `li`, `code`. Nothing else has been verified to survive the Plane editor.
-- Write tags as raw HTML. In text, write `<`, `>`, `&` as `&lt;`, `&gt;`, `&amp;`.
-- **Write the whole body as one line, with nothing between a closing `>` and the next `<`.** Plane stores the newlines and indentation between tags as text; the next time anyone saves the item from the web editor, each of those gaps becomes an empty bullet or empty paragraph — every real bullet ends up sandwiched between blank ones.
-- Read back with `description_html`, never `description_stripped` — stripping removes the `h3` tags and the blocks become indistinguishable lines.
-- A body that has been saved from the Plane web editor comes back with attributes on every element (`<h3 class="editor-heading-block" data-id="…">`) and without the outer `<div>`. Match tags with patterns that allow attributes, e.g. `<h3[^>]*>`.
-
-## Silent Failures (HTTP 200, Wrong Data)
-
-- **Escaped tags** (`&lt;p&gt;`) are stored literally and render as visible tag text.
-- **Unknown tags** (custom XML-style tags) are stripped on write — their content vanishes, and the call still succeeds.
-- **`state_group` returned by `create` / `update` is stale** (null on create, the pre-change value on update). Confirm state with `list`.
-- **A stale browser tab wins.** After an API edit, a Plane tab that was open before the edit will save its old copy over the whole body the next time the user edits there.
-- **Long Chinese payloads occasionally come back with U+FFFD (`�`) in place of a character.** Always read the body back after writing and search it for U+FFFD; if found, rewrite (rephrasing the affected sentence helps).
-
 ## Editing an Existing Body
 
 `update` replaces the **entire** `description_html`. So:
 
-1. `workitem(action="retrieve", fields="description_html,updated_at")` **immediately before** editing. Never edit from a copy read earlier in the session — the user may have changed the item in the web UI since, and your update would silently erase that.
-2. Apply the change to that fresh copy, keeping blocks you are not touching byte-for-byte.
-3. Write it back, then read it back and confirm the change landed, nothing else moved, and there is no U+FFFD.
-4. Tell the user to **refresh** any Plane tab that has this item open before editing it there. Reason: the stale-tab overwrite happens in the browser; nothing on the API side can prevent it.
+1. `workitem(action="retrieve", fields="description_html,name,updated_at")` **immediately before** editing. Never edit from a copy read earlier in the session — the user may have changed the item in the web UI since, and your update would silently erase that.
+2. Apply the change to that fresh copy, keeping blocks you are not touching byte-for-byte. If the item does not follow the template (an invented `h3`, a missing required block, whitespace between tags), the bundled hook rejects the update: convert the whole body to the template in this same edit, keeping its content, and tell the user what moved where.
+3. If the edit adds or removes an order between items, change the `blocked_by` relation too ("Creating a New Item" step 4) — never only the prose.
+4. Write it back, then run "After Writing".
+5. Tell the user to **refresh** any Plane tab that has this item open before editing it there. Reason: the stale-tab overwrite happens in the browser; nothing on the API side can prevent it.
 
 ## After Writing
 
-Read the item back (`description_html`) and check: the `h3` sequence is 为什么, 涉及范围, 风险, 完成标准, 验证, then only 不做 / 回退 / 注意; every C and V is numbered; at least one V is e2e (or `e2e：不适用` with a reason); no whitespace between tags (`>\s+<` matches nothing); no U+FFFD; exactly one `risk:*` Label, matching the first word of 风险. For a new item, also confirm it is attached to its Module(s). Then report the item's identifier, title, risk Label, and Module(s) to the user.
+Read the item back (`description_html`, `name`, `labels`) and check each of these mechanically, not by eye:
+
+- The `h3` sequence (match `<h3[^>]*>`) is exactly 为什么, 涉及范围, 风险, 完成标准, 验证, then only 不做 / 回退 / 注意 in that order.
+- C and V are numbered continuously from 1, in order; every V has `预期` and `覆盖`; at least one V is e2e (or `e2e：不适用` with a reason).
+- No newline between tags, and no whitespace next to a block tag (see `references/plane-html.md`); no U+FFFD.
+- Exactly one `risk:*` Label, matching the first word of 风险.
+- **Search the title and body for this project's identifier (`<IDENT>-\d+`) and for `第.{1,3}步`.** Every hit is either removed (it is a dependency → relation; a step number → rename) or restated in this item's own words. Then `workitem_relation(action="list")` shows every blocker the item actually has.
+- For a new item: attached to its Module(s), and step 4's `blocked_by` read back.
+
+Then report the item's identifier, title, risk Label, Module(s), and its `blocked_by` list (or "无 blocked_by") to the user.
