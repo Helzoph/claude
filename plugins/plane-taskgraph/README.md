@@ -62,8 +62,8 @@ evidence, and a path that is not actually ignored is refused.
 ### Hooks
 
 `hooks/hooks.json` registers two guards. Both are plain bash + `jq` and fail
-open: if `jq` is missing or the input does not parse, they say nothing and let
-the call through.
+open: if `jq` (or, for the Stop hook, `git`) is missing or the input does not
+parse, they say nothing and let the call through.
 
 - **`check-workitem-body.sh`** (`PreToolUse` on the plugin's Plane `workitem`
   tool, `create` / `update` only). It **rejects** the call — Claude sees the
@@ -74,19 +74,27 @@ the call through.
   looks like a work item identifier (`见 ABC-12`) or a numbered step (`第二步`),
   pointing at `blocked_by` instead; identifiers such as `UTF-8` also match, so
   this stays a note, not a rejection.
-- **`remind-state-update.sh`** (`Stop`). If the current turn ran a `git commit`
-  whose message carries a `Refs: <ITEM-ID>` trailer, but after the last such
-  commit it neither posted a comment nor changed the item's state, it holds the
-  turn open once and names what is missing. It fires at most once per stop
+- **`remind-state-update.sh`** (`Stop`). It asks git — not the text of the
+  Bash commands — whether the session's repository got a commit since the turn
+  started whose message has a `Refs: <ITEM-ID>` line (the same whole-line form
+  `changed-files.sh` looks for). If so, and after the last such commit the turn
+  did not both post a comment and change an item's state, it holds the turn
+  open once and names what is missing. It fires at most once per stop
   (`stop_hook_active`), so an item left open on purpose costs one sentence.
+  Asking git means a command that merely *contains* `git commit … Refs: X-1`
+  (a `claude -p` prompt in an e2e run, an `echo`) does not trigger it, and a
+  `git commit -F <file>` does.
 
 The skills already state these rules. The hooks exist because edits made
 without loading a skill never see them, and the end-of-turn state update is
 the step most often dropped. They only reject what is mechanically certain to
 be wrong; a guard that blocks too much gets switched off entirely.
 
-Known limits: a commit made with `git commit -F <file>` has no visible trailer
-and is not seen by the Stop hook; a body that is not in the template (an epic
+Known limits: the Stop hook only checks the session's working directory (the
+`cwd` it is given), so a commit made after `cd` into another repository or
+worktree is not seen, while a commit made in that directory by a child process
+(an e2e `claude -p` run pointed at the same repository) is; a body that is not
+in the template (an epic
 written by hand, say) is rejected on update until it is converted.
 
 ### MCP server
