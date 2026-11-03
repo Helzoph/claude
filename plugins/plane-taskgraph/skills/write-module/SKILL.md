@@ -16,12 +16,12 @@ The test: **after this change is finished, will this Module keep receiving new i
 3. **Attach the item to every Module it touches** — one per functional area in `涉及范围`:
 
    ```
-   module(action="manage_workitems", module_id=..., workitem_ids=[...])
+   module(action="manage_workitems", project_id=..., module_id=..., add_ids="<item-uuid>,<item-uuid>")
    ```
 
-   `manage_workitems` appends; it does not remove existing attachments, so call it once per Module. A PQL filter on either Module then returns the item. Reason: an item attached to only one of two areas is invisible to anyone looking at the other, and `pick-up-work` for that area under-counts.
+   `add_ids` is a string, not an array. `add_ids` appends; existing attachments stay unless you pass them in `remove_ids`, so call it once per Module. A PQL filter on either Module then returns the item. Reason: an item attached to only one of two areas is invisible to anyone looking at the other, and `pick-up-work` for that area under-counts.
 
-4. Read back with PQL to confirm, e.g. `module IN ("<module-uuid>")` for each Module.
+4. `manage_workitems` returns nothing — read back with `module(action="list_workitems", project_id=..., module_id=...)` for each Module and confirm the item is listed.
 
 ## When No Existing Module Fits
 
