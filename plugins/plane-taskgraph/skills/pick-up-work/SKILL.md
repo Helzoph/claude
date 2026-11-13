@@ -126,7 +126,7 @@ Old items missing these blocks is normal (the template came later). Ask one ques
 
 An item has open choices when it carries `needs:decision` **or** its body has a `待定` block. Either one alone counts — a mismatch between them is itself a sign the item was edited halfway. Do not start it: list each open choice with its candidates and the lean written there, and stop the turn. Reason: these are choices write-workitem reserves for the user; starting anyway means the agent makes them.
 
-When the user answers, resolve it as write-workitem, "Pending Decisions", describes (one update: answer into `注意` as `已定（YYYY-MM-DD）：…`, drop the `待定` entry, drop `needs:decision` when no entry is left, keep every other Label). Then continue with the risk check below.
+When the user answers, resolve it as write-workitem, "Pending Decisions", describes (one update: answer into `注意` as `已定（YYYY-MM-DD）：…`, drop the `待定` entry, drop `needs:decision` when no entry is left, keep every other Label). The `原因：` is the user's own reason as they stated it, or exactly `用户指定` when they only named the option — never a reason you supply, including the lean written in `待定` (see write-workitem, "Decisions Go in 注意, Dated"). Then continue with the risk check below.
 
 **A new open choice found while doing the item** — a number, default, or user-visible wording that neither the body nor the user settled — is handled the same way: stop before writing it, add a `待定` entry (and `needs:decision` if absent) per write-workitem, tell the user, and end the turn. Leave the state `started`; the code written so far stays uncommitted or is committed only if it does not depend on the choice. Reason: picking a value "for now" ships it — nobody revisits a placeholder that works.
 

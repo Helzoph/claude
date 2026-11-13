@@ -117,6 +117,8 @@ A bare "touch `client.ts`" or "don't do auto-refresh" cannot be re-evaluated lat
 
 A decision made while discussing the item ("use a sidecar, not a shared volume") is one `注意` entry starting with the literal `已定（YYYY-MM-DD）：`, followed by `原因：`. Not a paragraph in `为什么`, not a new `h3`. Reason: one fixed place means a later reader finds every decision by searching `已定`, and the date shows which decisions predate a change in circumstances.
 
+**The `原因：` of an `已定` entry comes only from the user's own words** — quote or closely paraphrase what they said in the conversation. If they gave no reason, write exactly `原因：用户指定` and nothing after it. Never fill the gap with a reason you inferred, however plausible. If your own reasoning is worth keeping, write it as a separate `注意` entry without `已定`, marked as yours (`agent 的判断：…`). Reason: a later reader takes an `已定` reason as the user's consideration and uses it to judge whether the decision still holds; an invented one sends that judgment the wrong way, which is worse than no reason at all.
+
 ### 风险
 
 The first word is the level. Then list **each** distinct failure symptom — what the user or the next agent would actually see — and how to undo the change. A risk mentioned only in `注意` is not written down: `风险` is what V items are checked against.
@@ -204,7 +206,7 @@ Only for what genuinely needs human eyes — whether a page reads well, whether 
 
 **When the user decides.** In **one** `update`, after a fresh `retrieve` (see "Editing an Existing Body"):
 
-1. add a `注意` entry `已定（YYYY-MM-DD）：<the choice>。原因：<the user's reason, or "用户指定">`;
+1. add a `注意` entry `已定（YYYY-MM-DD）：<the choice>。原因：<the user's reason in their words, or exactly "用户指定" if they gave none>` — never a reason the user did not state (see "Decisions Go in 注意, Dated"); the lean you wrote in `待定` is not the user's reason, even when they chose that option;
 2. delete that `待定` entry — and the whole block, heading included, once it is empty;
 3. if the block is gone, drop the `needs:decision` id from `labels` and keep every other Label id.
 
@@ -280,6 +282,7 @@ Read the item back (`description_html`, `name`, `labels`) and check each of thes
 
 - The `h3` sequence (match `<h3[^>]*>`) is exactly 为什么, 涉及范围, 风险, 完成标准, 验证, then only 不做 / 回退 / 待定 / 注意 in that order.
 - `待定` is present **if and only if** `labels` maps to `needs:decision`; and no number, default, or user-visible wording appears in the body as settled unless the user stated it (otherwise it belongs in `待定`).
+- Every `已定` entry's `原因：` can be traced to something the user said in the conversation, or is exactly `用户指定`. A reason you cannot point to in the user's words is removed and replaced with `用户指定`.
 - C and V are numbered continuously from 1, in order; every V has `预期` and `覆盖`; at least one V is e2e (or `e2e：不适用` with a reason).
 - No newline between tags, and no whitespace next to a block tag (see `references/plane-html.md`); no U+FFFD.
 - Exactly one `risk:*` Label, matching the first word of 风险.
