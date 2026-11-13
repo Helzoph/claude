@@ -6,23 +6,28 @@ Each e2e states its entry command, its input, how the result is read back, and t
 
 ## A Skill or Plugin
 
-Run Claude Code headless against the plugin directory in the repo, then assert on the transcript with jq:
+Use the bundled runner. From the fixture directory the run should happen in (a temp `git init` repo, or the repo under test):
 
 ```bash
-P="$(git rev-parse --show-toplevel)/plugins/<plugin>"
-claude -p "<prompt>" --plugin-dir "$P" \
-  --output-format stream-json --verbose --max-budget-usd 3 \
-  --allowedTools <tools this run needs> > /tmp/<item>-<V>-<round>.jsonl
+<plugin dir>/scripts/e2e.sh "$TMPDIR/<item>-<V>.jsonl" "<prompt>"
 ```
 
-To play the user's reply, run the same command with `--resume <session_id>` from the previous round. Every round passes four generic assertions (F is that round's jsonl):
+It starts `claude -p` headless with `--plugin-dir` pointing at the repository copy of the plugin, stream-json output, `--max-budget-usd 3` and `--max-turns 30` (macOS has no `timeout`; these bound the run), and a default `--allowedTools` list (Skill, Read, Bash, Edit, Write, and the claude.ai Plane connector tools). Extra arguments after the prompt are passed to `claude`. `--dry-run` prints the command and environment without running it; `--check <jsonl>` re-runs only the assertions on an existing transcript.
 
-- The repo copy of the plugin was loaded: `jq -r 'select(.subtype=="init") | .plugins[] | select(.name=="<plugin>") | .source + " " + .version' F` prints `<plugin>@inline` and the version in plugin.json. Reason: with a marketplace install present, a stale cached copy can be tested instead.
-- Which skills fired: `jq -r 'select(.type=="assistant").message.content[] | select(.type=="tool_use" and .name=="Skill") | .input.skill' F`.
-- Which tools ran: `jq -c 'select(.type=="assistant").message.content[] | select(.type=="tool_use") | [.name, (.input.skill // .input.action)]' F`.
-- How it ended: `jq -c 'select(.type=="result") | [.is_error, (.permission_denials | length), .session_id]' F` — the first two must be `false` and `0`. Reason: a denied tool makes the agent stop or skip steps in a way that looks identical to correct behaviour.
+It then prints four generic assertions and exits non-zero if any fails. In the V, `预期` names the run's exit status plus whatever is specific to this V (which skill line, which reply text, which read-back value):
 
-macOS has no `timeout`; bound a run with `--max-budget-usd`, not by wrapping it.
+- **plugin** (fails the run): the `init` event loaded `<plugin>@inline` at the version in plugin.json. Reason: with a marketplace install present, a stale cached copy can be tested instead.
+- **skills** (reported): every `Skill` tool call's `.input.skill`.
+- **tools** (reported): every tool call as `[name, skill-or-action]`.
+- **ending** (fails the run): the `result` event has `is_error` false and `permission_denials` empty; a missing `result` event also fails. Reason: a denied tool makes the agent stop or skip steps in a way that looks identical to correct behaviour.
+
+Three traps the runner handles or exposes through environment variables:
+
+- **The skill under test never fires.** With many plugins installed, Claude Code cuts the skill list to names only, so a skill's description is invisible and the agent may never load it. The runner sets `SLASH_COMMAND_TOOL_CHAR_BUDGET=60000` by default. Set `E2E_SKILL_BUDGET=default` to leave it unset — for a V that tests triggering under the real, cut-down list — or to a number to use that.
+- **Another plugin's hook breaks the child session** (e.g. a Stop hook that loops in the sandbox). Pass its id in `E2E_DISABLE_PLUGINS=<plugin>@<marketplace>[,...]`; the runner disables it with `--settings`. Which plugins misbehave depends on the machine, so nothing is disabled by default.
+- **A multi-turn exchange cannot be resumed.** In a sandboxed parent, the child session cannot write its transcript under `~/.claude/projects`, so `--resume <session_id>` finds nothing. Fold the exchange into one prompt instead: state the user's later reply up front ("When you ask for confirmation, treat the answer as 「确认」") and assert on the final state.
+
+Override the tool list with `E2E_ALLOWED_TOOLS` and the bounds with `E2E_MAX_BUDGET_USD` / `E2E_MAX_TURNS`. When the parent session runs Bash in a network sandbox, the run needs `api.anthropic.com` (and `mcp-proxy.anthropic.com` for the claude.ai connectors) allowed.
 
 ## Other Entry Points
 

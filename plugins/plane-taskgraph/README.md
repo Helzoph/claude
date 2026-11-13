@@ -61,6 +61,15 @@ HTML, straight from git: every commit whose message carries the trailer line
 extra arguments; they are listed with their `git check-ignore -v` line as
 evidence, and a path that is not actually ignored is refused.
 
+`scripts/e2e.sh <out.jsonl> <prompt>` runs one headless `claude -p` session
+against this repository's copy of the plugin (from the current directory, so
+`cd` into the fixture first) and checks the transcript: the repo copy at the
+manifest's version was loaded, which skills and tools ran, and that the run
+ended with no error and no permission denials. `--check <out.jsonl>` re-checks
+an existing transcript; `--dry-run` prints the command. Environment knobs
+(`E2E_SKILL_BUDGET`, `E2E_DISABLE_PLUGINS`, …) are listed at the top of the
+script and explained in `skills/write-workitem/references/e2e-recipe.md`.
+
 ### Hooks
 
 `hooks/hooks.json` registers two guards. Both are plain bash + `jq` and fail
