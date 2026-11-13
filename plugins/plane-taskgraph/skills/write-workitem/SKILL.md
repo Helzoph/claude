@@ -118,9 +118,11 @@ The first word is the level. Then list **each** distinct failure symptom — wha
 
 | Level | Criteria |
 |---|---|
-| `high` | Irreversible, or reaches outside the repository: data migration or deletion; external side effects (sending messages, charging money, publishing, `git push`); credentials or permissions; CI, deployment, production config; public interfaces, or an architecture pattern others will copy |
-| `medium` | Changes user-visible behaviour or core logic, but `git revert` undoes it cleanly |
+| `high` | Undoing it takes anything beyond one `git revert`: a migration that deletes or rewrites existing data; external side effects (sending messages, charging money, publishing, `git push`); credentials or permissions; CI, deployment, production config; a public interface that already has outside users |
+| `medium` | Changes user-visible behaviour or core logic, but one `git revert` undoes it cleanly. Includes additive data changes (a new column or table) that ship with a down migration |
 | `low` | Changes no behaviour: docs, comments, tests, features behind a disabled flag, internal scripts |
+
+The level measures **only how hard the change is to undo** — not how large, central, or likely to be copied it is. Ask: "if this turns out wrong tomorrow, is one `git revert` enough?" Yes → `medium` or `low`; anything more (a rollback migration, telling someone, something already sent that cannot be recalled) → `high`. Design choices the user still has to make are a separate question, not a reason to raise the level.
 
 Rate the item by the **most dangerous** place listed in `涉及范围`. When unsure, go one level higher: rating too low means an irreversible change ships without being discussed; rating too high costs one discussion.
 
