@@ -1,6 +1,6 @@
 ---
 name: pick-up-work
-description: "Answer or act on any request about work already in Plane — what can start now, doing an item, changing an item's state or marking it done ('把 ABC-12 标完成', 'close ABC-12'), or status questions ('is the X module done?', 'X 模块做完了吗', 'X 的进度', 'is the login delivery done?') — instead of calling the Plane tools directly. Reads a task graph back from Plane and computes which work items can start right now, by checking whether each item's blocked_by dependencies are all done; then do an item — read its body (current h3 or old strong-heading format), move it to a started state before the first edit, pause for the user according to its risk:* Label, commit with a `Refs: <ITEM-ID>` trailer, post a verification-record comment whose changed-files block is generated from git by a bundled script, and only then mark it done and read the state back, keeping the item's parent (its delivery) in step. Use this skill when picking up work already recorded in Plane — triggers on 'implement the xxx feature', 'do ABC-12', 'what can I work on next', 'what's unblocked', 'I finished ABC-12', 'ABC-12 做完了', and whenever code was just committed for an item that Plane still shows as not done. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane) or for writing an item body (use write-workitem)."
+description: "Answer or act on any request about work already in Plane — what can start now, doing an item, changing an item's state or marking it done ('把 ABC-12 标完成', 'close ABC-12'), or status questions ('is the X module done?', 'X 模块做完了吗', 'X 的进度', 'is the login delivery done?') — instead of calling the Plane tools directly. Reads a task graph back from Plane and computes which work items can start right now, by checking whether each item's blocked_by dependencies are all done and setting aside items that wait on a user decision (needs:decision); then do an item — read its body (current h3 or old strong-heading format), move it to a started state before the first edit, stop on open choices (needs:decision or a 待定 block) and ask the user, pause for a brief confirmation on risk:high, commit with a `Refs: <ITEM-ID>` trailer, post a verification-record comment whose changed-files block is generated from git by a bundled script, and only then mark it done and read the state back, keeping the item's parent (its delivery) in step. Use this skill when picking up work already recorded in Plane — triggers on 'implement the xxx feature', 'do ABC-12', 'what can I work on next', 'what's unblocked', 'I finished ABC-12', 'ABC-12 做完了', and whenever code was just committed for an item that Plane still shows as not done. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane) or for writing an item body (use write-workitem)."
 ---
 
 # Read the Task Graph Back From Plane and Compute What Can Start Now
@@ -27,7 +27,7 @@ Follow `next_cursor` while `next_page_results` is true. Step 4 judges blockers a
 ```
 workitem(action="list", project_id=...,
   pql='module = "<module-uuid>" AND stateGroup IN openStates() AND NOT hasChildren()',
-  fields='id,sequence_id,name,state_group,parent')
+  fields='id,sequence_id,name,state_group,parent,labels')
 ```
 
 PQL merges "list everything", "exclude finished", and "exclude parents" into one call; what comes back is the candidate set. To read one delivery instead of one Module, replace the `module = …` condition with `childOf("<PARENT-ID>")`.
@@ -70,7 +70,7 @@ A blocker in another project (a cross-project relation) is in neither set. Look 
 
 ### 5. Derive the Result
 
-Items whose `blocked_by` entries are all done (or that have no `blocked_by` at all) = the items that can start in parallel now.
+Items whose `blocked_by` entries are all done (or that have no `blocked_by` at all) = the items that can start in parallel now — **except items carrying `needs:decision`** (map `labels` ids to names with `label(action="list")` first). Those go in a separate group, `等你决定`, each with the open choices from its `待定` block (one `retrieve` of `description_html` per such item). Reason: the item is unblocked by other work but still blocked by the user; offering it as ready means the agent picks the answer itself, which is exactly what the Label exists to prevent.
 
 **Multiple `blocked_by` entries are AND**: all must be done to unlock; missing even one is not enough.
 
@@ -79,7 +79,7 @@ Items whose `blocked_by` entries are all done (or that have no `blocked_by` at a
 Steps 1–5 answer "what can start". When the user asks to actually do an item, go through these steps in order. Two of them are state writes, and they are the steps most often forgotten — the code gets written, the turn ends, and Plane still says `backlog`. Reason: the board is the only place anyone else (the user, the next agent, `pick-up-work` itself) learns that an item started or finished; a forgotten state write makes the next parallel set wrong.
 
 1. Read the body ("Read the Body").
-2. Check the risk level and pause if it says so ("Risk Level: When to Pause").
+2. Check for open choices and the risk level, and pause if either says so ("Open Choices: Stop", "Risk Level: When to Pause").
 3. **State → `started`** ("Set State Before Starting"). Before the first file edit.
 4. Implement; every commit carries `Refs: <ITEM-ID>` ("Commits").
 5. Run the `验证` steps and post the verification record ("Verification Record").
@@ -122,21 +122,28 @@ Reason: the title says only what to do, not how far to go to be done. When crite
 
 Old items missing these blocks is normal (the template came later). Ask one question to clarify, then add the answer to the body in the current h3 format, following write-workitem's "Editing an Existing Body" — so it need not be asked again next time.
 
+### Open Choices: Stop
+
+An item has open choices when it carries `needs:decision` **or** its body has a `待定` block. Either one alone counts — a mismatch between them is itself a sign the item was edited halfway. Do not start it: list each open choice with its candidates and the lean written there, and stop the turn. Reason: these are choices write-workitem reserves for the user; starting anyway means the agent makes them.
+
+When the user answers, resolve it as write-workitem, "Pending Decisions", describes (one update: answer into `注意` as `已定（YYYY-MM-DD）：…`, drop the `待定` entry, drop `needs:decision` when no entry is left, keep every other Label). Then continue with the risk check below.
+
+**A new open choice found while doing the item** — a number, default, or user-visible wording that neither the body nor the user settled — is handled the same way: stop before writing it, add a `待定` entry (and `needs:decision` if absent) per write-workitem, tell the user, and end the turn. Leave the state `started`; the code written so far stays uncommitted or is committed only if it does not depend on the choice. Reason: picking a value "for now" ships it — nobody revisits a placeholder that works.
+
 ### Risk Level: When to Pause
 
 The level comes from the item's Label — exactly one of `risk:high` / `risk:medium` / `risk:low` (rules in write-workitem). `labels` on an item are **ids**: map them to names with `label(action="list", project_id=...)` first. Reason: comparing an id with `risk:high` never matches, and every item would look unlabelled.
 
 | Level | Before any write | Before marking done |
 |---|---|---|
-| `risk:high` | **discuss and wait** — after reading the body, before changing state, editing files, or committing | **wait for confirmation** |
+| `risk:high` | **brief confirmation** — after reading the body, before changing state, editing files, or committing | **wait for confirmation** |
 | `risk:medium` | **tell, don't wait** | no pause — report it, then mark done |
 | `risk:low` | no | no — mark it done yourself once the gate below passes |
 
 - **`risk:medium` — tell the user, never wait.** When starting, say in one line that this is a `medium` item and which places it touches, then keep going in the same turn. In the final report, list it separately: the item, the files changed, and how to undo it (`git revert <commit>`). Then mark it done yourself. Reason: medium is undone cleanly by `git revert`, so the user needs to know it happened, not to approve it.
-- **`risk:high` — discuss before any write.** Lay out the plan, the places it will change, how a mistake would show up, how it would be undone, and every open point the user should decide. Then stop the turn and write nothing. Reason: a high change cannot be cleanly undone, so the user should shape it, not just approve it.
-  - If the user proposes changes, revise the plan, lay it out again, and keep waiting — **a proposed change is not consent**.
+- **`risk:high` — brief confirmation before any write.** In a few lines: what will change outside the repository or beyond one `git revert` (the reason it is `high`), and how it would be undone, taken from `回退`. Then stop the turn and write nothing. Reason: `high` means the change cannot be undone with one `git revert`, so the user approves the one irreversible step knowingly; the design choices themselves were already settled through `待定` before the item could start, so there is nothing else to discuss here.
   - Start only on an explicit go-ahead ("确认", "可以", "go ahead"). No reply, or a reply about something else, is **not** a go-ahead — answer it if asked, and keep waiting.
-  - If the discussion changed the item's `涉及范围`, `完成标准`, or `回退`, first update the body to the agreed version (write-workitem's "Editing an Existing Body"), then start. Reason: the verification record is checked against the body; an outdated body makes the agreed work look out of scope.
+  - If the user proposes changes instead, that is not consent: update the body to the agreed version (write-workitem's "Editing an Existing Body"), show the new confirmation, and keep waiting. Reason: the verification record is checked against the body; an outdated body makes the agreed work look out of scope.
 - **Waiting for confirmation** (high, before marking done): stop the turn and write nothing; the same explicit go-ahead rule applies.
 - **No risk Label, or more than one** → treat as `high`, and ask the user which level it should be. A Label whose name is not exactly one of the three does not count.
 - **Label and the first word of `风险` disagree** → treat as the **higher** of the two, and ask which one is right.
@@ -251,7 +258,7 @@ If both a Module and a parent match the name, say which one you answered for. If
 
 ## Report to the User
 
-List the batch that can start in parallel (identifier + title + risk Label), grouped under each item's parent title when it has one (one `list` with `pql='hasChildren()'`, `fields='id,sequence_id,name'` maps the `parent` uuids from step 1b to titles), and **what each blocked item is waiting on**. The latter matters just as much — only by seeing "what is being waited on" can the user judge whether to adjust priorities.
+List the batch that can start in parallel (identifier + title + risk Label), grouped under each item's parent title when it has one (one `list` with `pql='hasChildren()'`, `fields='id,sequence_id,name'` maps the `parent` uuids from step 1b to titles), then the `等你决定` group (each item with its open choices), and **what each blocked item is waiting on**. The last two matter just as much — only by seeing "what is being waited on" can the user judge whether to adjust priorities.
 
 After dependencies change (one item finished, or a new dependency added), **recompute** — do not reuse the previous result.
 

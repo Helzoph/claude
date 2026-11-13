@@ -26,7 +26,8 @@ sentence:
 | Which functional area an item touches | Module (one per long-lived area, e.g. one plugin) |
 | Which delivery an item is part of | `parent` field, pointing at a parent item (one per delivery) |
 | What has to come first | `blocked_by` relation |
-| How risky it is | Exactly one Label: `risk:high` / `risk:medium` / `risk:low` |
+| How hard it is to undo | Exactly one Label: `risk:high` / `risk:medium` / `risk:low` |
+| Whether it waits on your decision | Label `needs:decision`, mirrored by a `待定` block in the body |
 | Whether it's done | State (its `group`, not its name) |
 | Why, scope, done-criteria, how to verify | Description, in a fixed `h3` template |
 | What was verified, against which commit | One comment per verification run |
@@ -45,10 +46,10 @@ like a correct one. Computed from the graph (unfinished items whose
 
 | Skill | Triggers on | What it does |
 |---|---|---|
-| [`write-workitem`](skills/write-workitem/SKILL.md) | filing or editing a single item, "rate the risk of ABC-3", "add this decision to ABC-3", "this item depends on ABC-2", "put ABC-3 under the login delivery" | The source of truth for an item body: the `h3` template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证, plus optional 不做 / 回退 / 注意), the `risk:*` Label rules, a variant for design / spike items, the short parent-item template (为什么 / 交付, plus optional 不做 / 注意), dependencies as `blocked_by` relations (never prose), and how e2e checks are written so the agent can run them headless. Format rules and the e2e recipe live in `references/` |
+| [`write-workitem`](skills/write-workitem/SKILL.md) | filing or editing a single item, "rate the risk of ABC-3", "add this decision to ABC-3", "this item depends on ABC-2", "put ABC-3 under the login delivery" | The source of truth for an item body: the `h3` template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证, plus optional 不做 / 回退 / 待定 / 注意), the `risk:*` and `needs:decision` Label rules, a variant for design / spike items, the short parent-item template (为什么 / 交付, plus optional 不做 / 注意), dependencies as `blocked_by` relations (never prose), and how e2e checks are written so the agent can run them headless. Format rules and the e2e recipe live in `references/` |
 | [`write-module`](skills/write-module/SKILL.md) | "which module does this go in", "create a module for X" | Maps an item onto existing functional Modules (attaching it to every one it touches); creates a new Module only after you agree, with a plain-text description template |
 | [`plan-to-plane`](skills/plan-to-plane/SKILL.md) | "record this into Plane", "break this into work items" | Groups the design into deliveries (one parent item each, shown to you before writing), orchestrates the two above, then **wires the `blocked_by` relations** as a separate mandatory step and lists every relation back to you |
-| [`pick-up-work`](skills/pick-up-work/SKILL.md) | "what can I work on next", "do ABC-12", "is the X module done?" | Computes what can start now (parents excluded, blockers judged against every open item in the project); does an item as an eight-step checklist — reads the body, moves it to a started state, pauses according to its risk Label, commits with a `Refs: ABC-12` trailer, posts a verification-record comment, and only then marks it done and reads the state back — then moves the parent along when its first child starts or its last open child completes |
+| [`pick-up-work`](skills/pick-up-work/SKILL.md) | "what can I work on next", "do ABC-12", "is the X module done?" | Computes what can start now (parents and `needs:decision` items excluded, blockers judged against every open item in the project); does an item as an eight-step checklist — reads the body, moves it to a started state, stops on `needs:decision`, asks for a brief confirmation on `risk:high`, commits with a `Refs: ABC-12` trailer, posts a verification-record comment, and only then marks it done and reads the state back — then moves the parent along when its first child starts or its last open child completes |
 
 ### Script
 
@@ -124,16 +125,33 @@ that copy. Plain parents rather than Plane's Epic type, because Epics need the
 `epics` and `work_item_types` project features, which a fresh project does not
 have.
 
-**Risk is a Label, and it changes what the agent does.** `risk:high` (hard to
-undo, or reaches outside the repo) stops before any write to discuss the plan
-with you — what changes, how it could fail, how to undo it — and waits again
-before marking done; it cannot start without a `回退` block. `risk:medium`
-(undone cleanly by `git revert`) never waits: the agent says so when it starts
-and lists the item, its files and its revert command in the final report.
-`risk:low` runs through on its own. A missing Label, two Labels, or a Label that
-disagrees with the body's 风险 paragraph is treated as the higher level, and the
-agent asks. Only an explicit "yes" counts as a go-ahead — an unrelated reply or
-a counter-proposal does not.
+**Risk is a Label, and it measures only how hard the change is to undo.**
+`risk:high` means one `git revert` is not enough — a data migration without a
+down step, a message sent, a `git push`, credentials, deployment. Before any
+write the agent stops with a short confirmation: what will change beyond the
+repo and how it would be undone (it cannot start without a `回退` block); it
+waits again before marking done. `risk:medium` (undone cleanly by
+`git revert`, including an additive migration that ships with its down step)
+never waits: the agent says so when it starts and lists the item, its files and
+its revert command in the final report. `risk:low` runs through on its own. A
+missing Label, two Labels, or a Label that disagrees with the body's 风险
+paragraph is treated as the higher level, and the agent asks. Only an explicit
+"yes" counts as a go-ahead — an unrelated reply or a counter-proposal does not.
+
+**Choices you have not made are a separate Label: `needs:decision`.** Any
+number, default, rule or user-visible wording you did not state goes into the
+item's `待定` block — each with the candidates and the agent's lean — and the
+item carries `needs:decision`. Such an item is never offered as ready to start;
+`pick-up-work` lists it under `等你决定` instead. When you answer, one update
+moves the answer into `注意` as `已定（date）`, removes the `待定` entry and
+drops the Label. This is kept apart from risk on purpose: a choice that needs
+you is not the same thing as a change that is hard to undo, and folding the two
+together made `high` mean "talk to me first" for things a revert could fix.
+
+The split follows two Anthropic write-ups:
+[Solving code review at Anthropic](https://claude.dev/blog/solving-code-review-at-anthropic/)
+and
+[Redesigning source control](https://www.anthropic.com/engineering/redesigning-source-control).
 
 **No verification record, no "done".** Before an item may move to the
 `completed` group, the agent posts one comment with four blocks: the verdict
