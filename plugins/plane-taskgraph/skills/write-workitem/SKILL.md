@@ -1,6 +1,6 @@
 ---
 name: write-workitem
-description: "Write or edit the body or title of a single Plane work item: the fixed h3 template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证 / 不做 / 回退 / 注意), numbered completion criteria C1..Cn, numbered verification steps V1..Vn with an agent-run e2e, a risk level, and the item's blocked_by dependencies. Use this skill whenever one work item's description or title is being created or changed — triggers on 'record a bug in Plane', 'add a work item', 'file an issue for this', 'write up this task', 'make this item's criteria more specific', 'add this decision to ABC-3', 'update ABC-3', 'fix the format of ABC-3', 'this item depends on ABC-2', and whenever plan-to-plane or pick-up-work needs to write or patch an item body. Also covers design / spike items whose output is a decision rather than code, and parent items that group the items of one delivery (short template 为什么 / 交付 / 不做 / 注意, set through the `parent` field — 'group these items', 'put ABC-3 under the login delivery'). The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for deciding which Module an item belongs to (use write-module) or for computing what can start next (use pick-up-work)."
+description: "Write or edit the body or title of a single Plane work item: the fixed h3 template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证 / 不做 / 回退 / 待定 / 注意), numbered completion criteria C1..Cn, numbered verification steps V1..Vn with an agent-run e2e, a risk level, open choices the user still has to make (待定 + needs:decision), and the item's blocked_by dependencies. Use this skill whenever one work item's description or title is being created or changed — triggers on 'record a bug in Plane', 'add a work item', 'file an issue for this', 'write up this task', 'make this item's criteria more specific', 'add this decision to ABC-3', 'update ABC-3', 'fix the format of ABC-3', 'this item depends on ABC-2', and whenever plan-to-plane or pick-up-work needs to write or patch an item body. Also covers design / spike items whose output is a decision rather than code, and parent items that group the items of one delivery (short template 为什么 / 交付 / 不做 / 注意, set through the `parent` field — 'group these items', 'put ABC-3 under the login delivery'). The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for deciding which Module an item belongs to (use write-module) or for computing what can start next (use pick-up-work)."
 ---
 
 # Write a Plane Work Item Body
@@ -32,7 +32,7 @@ Reason: `pick-up-work` computes what can start **only** from `blocked_by`. An or
 
 0. **Pick the parent.** List the open parents: `workitem(action="list", project_id=..., pql='isTopLevel() AND hasChildren() AND stateGroup IN openStates()', fields='id,sequence_id,name')`. If this item belongs to one of those deliveries, pass `parent=<its uuid>` in step 2. If the conversation did not settle it, ask; "no parent" is a valid answer for a one-off fix. If the chosen parent is in the `completed` group, adding a child reopens the delivery — move the parent to a `started`-group state after step 2 and say so in the report. Reason: a parent marked done while it has an open child tells the board the delivery shipped when it did not.
 1. **Pick the Module(s) first** — invoke the `plane-taskgraph:write-module` skill and follow its "Attaching an Item" rules against the places this item will list in `涉及范围`. If no existing Module fits, write-module says to stop and ask: do that **before** creating the item. Reason: an item created without a Module is invisible to anyone reading the board by Module, and `pick-up-work` never offers it.
-2. Write the body per this skill, then `workitem(action="create", labels=[<the one risk:* label id>], parent=<from step 0, if any>)` — see "The Risk Label".
+2. Write the body per this skill, then `workitem(action="create", labels=[<the one risk:* label id>, <needs:decision id if the body has 待定>], parent=<from step 0, if any>)` — see "The Risk Label" and "Pending Decisions".
 3. Attach it to every Module chosen in step 1 (`module(action="manage_workitems")`) and read back, as write-module describes.
 4. **Dependencies.** Ask yourself — and the user, if the conversation did not settle it — which existing items must be finished before this one can start. For each, from **this** (the blocked) item: `workitem_relation(action="create", project_id=..., workitem_id=<this item>, workitem_ids=[<blocker ids>], relation_type="blocked_by")`. Then `workitem_relation(action="list", workitem_id=<this item>)` and confirm every blocker appears under `dependencies.blocked_by`. If nothing blocks it, say so in the report ("无 blocked_by") so the absence is a decision, not an omission.
 5. Run "After Writing" below.
@@ -43,7 +43,7 @@ When several items with an order between them are being filed together, use `pla
 
 ## The Template
 
-Blocks appear in this order. The first five are **required**; the last three are optional and are **deleted entirely** (heading included) when empty — an empty heading reads as "someone forgot", not "nothing to say". **No other `h3` is allowed**, and block names carry no suffix: `涉及范围（初步）` is not `涉及范围`. Reason: `pick-up-work` and the bundled hook match the names exactly; an invented block is content nobody reads back.
+Blocks appear in this order. The first five are **required**; the last four are optional and are **deleted entirely** (heading included) when empty — an empty heading reads as "someone forgot", not "nothing to say". **No other `h3` is allowed**, and block names carry no suffix: `涉及范围（初步）` is not `涉及范围`. Reason: `pick-up-work` and the bundled hook match the names exactly; an invented block is content nobody reads back.
 
 | Block | Required | What goes in it |
 |---|---|---|
@@ -54,6 +54,7 @@ Blocks appear in this order. The first five are **required**; the last three are
 | `验证` | yes | Numbered checks V1..Vn that prove the C items |
 | `不做` | no | Things deliberately left out, each with `原因：` |
 | `回退` | no (required for `high`) | Exact steps to undo, and what cannot be undone |
+| `待定` | no (requires `needs:decision`) | Choices the user has not made yet, each with the options and the agent's lean — see "Pending Decisions" |
 | `注意` | no | Known traps, and decisions already made, each with `原因：` |
 
 The template is indented here only to be readable. **Send it as one line** — see `references/plane-html.md`.
@@ -96,6 +97,10 @@ The template is indented here only to be readable. **Send it as one line** — s
 <h3>不做</h3>
 <ul>
   <li>… 原因：…</li>
+</ul>
+<h3>待定</h3>
+<ul>
+  <li>默认透明度：候选 60% / 80% / 100%。倾向 80%，原因：…</li>
 </ul>
 <h3>注意</h3>
 <ul>
@@ -182,11 +187,28 @@ How to write the entry command and assertions — headless `claude -p --plugin-d
 
 Only for what genuinely needs human eyes — whether a page reads well, whether a design looks right. Write it as its own V labelled `人工检查`, and say why the agent cannot do it. A 人工检查 is not an e2e and never replaces one.
 
-### 不做 / 回退 / 注意
+### 不做 / 回退 / 待定 / 注意
 
 - `不做`: scope that was considered and deliberately excluded. Writing it down is what lets a later "should this also…" be answered without re-litigating.
 - `回退`: required when the level is `high`. If you cannot write how to undo a `high` change, stop and ask the user before creating the item.
+- `待定`: choices waiting on the user — see "Pending Decisions".
 - `注意`: traps and constraints the implementer would otherwise hit, and dated decisions (see "Decisions Go in 注意, Dated").
+
+### Pending Decisions
+
+**What counts as pending.** Any value or choice the user has **not stated explicitly** in the conversation: a number or threshold, a default, a rule of play, wording or behaviour the user will see, a choice between two designs that both work. Do not pick one yourself and file it as settled — that is how a reasonable-looking guess becomes a decision nobody made. Implementation details the user would never notice (a variable name, which helper to call) are not pending.
+
+**How to write it.** One `待定` entry per open choice: what has to be chosen, the candidates, and which one you lean towards with `原因：`. Rate the item's risk as if the leaning option were chosen; a pending choice does not by itself raise the level.
+
+**The `needs:decision` Label.** An item has a `待定` block **if and only if** it carries the Label `needs:decision` (exactly that name). Reason: the Label makes every waiting item queryable (`label IN ("needs:decision")`) and is what `pick-up-work` uses to hold the item back; the block holds the detail. When they disagree, treat the item as pending. Get the id with `label(action="list")`; if the project has no such Label, create it and say so in the report. The item still carries exactly one `risk:*` Label next to it.
+
+**When the user decides.** In **one** `update`, after a fresh `retrieve` (see "Editing an Existing Body"):
+
+1. add a `注意` entry `已定（YYYY-MM-DD）：<the choice>。原因：<the user's reason, or "用户指定">`;
+2. delete that `待定` entry — and the whole block, heading included, once it is empty;
+3. if the block is gone, drop the `needs:decision` id from `labels` and keep every other Label id.
+
+Reason: body and Label change together, so there is never a moment when the item reads as decided in one place and pending in the other; and `labels` in `update` replaces the whole list, so sending only what you remembered erases the user's other Labels.
 
 ## Design / Spike Items
 
@@ -256,7 +278,8 @@ Two required blocks, two optional, in this order. **No other `h3`**; in particul
 
 Read the item back (`description_html`, `name`, `labels`) and check each of these mechanically, not by eye:
 
-- The `h3` sequence (match `<h3[^>]*>`) is exactly 为什么, 涉及范围, 风险, 完成标准, 验证, then only 不做 / 回退 / 注意 in that order.
+- The `h3` sequence (match `<h3[^>]*>`) is exactly 为什么, 涉及范围, 风险, 完成标准, 验证, then only 不做 / 回退 / 待定 / 注意 in that order.
+- `待定` is present **if and only if** `labels` maps to `needs:decision`; and no number, default, or user-visible wording appears in the body as settled unless the user stated it (otherwise it belongs in `待定`).
 - C and V are numbered continuously from 1, in order; every V has `预期` and `覆盖`; at least one V is e2e (or `e2e：不适用` with a reason).
 - No newline between tags, and no whitespace next to a block tag (see `references/plane-html.md`); no U+FFFD.
 - Exactly one `risk:*` Label, matching the first word of 风险.
@@ -266,4 +289,4 @@ Read the item back (`description_html`, `name`, `labels`) and check each of thes
 
 For a **parent**, the checks are instead: the `h3` sequence is exactly 为什么, 交付, then only 不做 / 注意 in that order; no newline between tags and no U+FFFD; no `risk:*` Label; not attached to any Module; no `blocked_by`; the identifier / `第.{1,3}步` search on title and body finds nothing.
 
-Then report the item's identifier, title, risk Label, Module(s), parent (or "无 parent"), and its `blocked_by` list (or "无 blocked_by") to the user. For a parent: identifier, title, and "parent item".
+Then report the item's identifier, title, risk Label, `needs:decision` with each open choice (if any), Module(s), parent (or "无 parent"), and its `blocked_by` list (or "无 blocked_by") to the user. For a parent: identifier, title, and "parent item".

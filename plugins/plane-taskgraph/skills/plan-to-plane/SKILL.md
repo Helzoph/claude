@@ -15,7 +15,7 @@ The goal is not "save the idea" but **save it in a structure that can be read ba
 | Module | One **functional area** of the codebase with a long-lived responsibility (e.g. one plugin) — see `write-module` |
 | Parent item | One **delivery**: the items that together make one thing the user would call done ("BUFF 扫码登录能用了"). Groups items through their `parent` field — see `write-workitem`, "Parent Items" |
 | Work item | One change that delivers one observable behaviour and can be reviewed on its own — body per `write-workitem` |
-| Label | **Only** the risk level: `risk:high` / `risk:medium` / `risk:low` — rules in `write-workitem` |
+| Label | Exactly one risk level (`risk:high` / `risk:medium` / `risk:low`), plus `needs:decision` while the item has open choices — rules in `write-workitem` |
 
 Cycle is not used: it is a time dimension (sprint), which this workflow does not have.
 
@@ -46,7 +46,7 @@ Before writing anything, split the plan's items into deliveries and show the gro
 
 1. **Modules** — invoke `plane-taskgraph:write-module` and map every item to existing functional Modules. If one is missing, write-module says to stop and ask; do so before creating anything.
 2. **Parents** — for each new delivery, create its parent item per write-workitem, "Parent Items" (template 为什么 / 交付; no Label, no Module).
-3. **Items** — invoke `plane-taskgraph:write-workitem` and create the items one by one, each with its body, exactly one `risk:*` Label, and `parent=<its delivery's parent uuid>`.
+3. **Items** — invoke `plane-taskgraph:write-workitem` and create the items one by one, each with its body, exactly one `risk:*` Label, `needs:decision` if its body has a `待定` block, and `parent=<its delivery's parent uuid>`.
 4. **Attach** — `module(action="manage_workitems")` for each Module, as write-module describes. Children only; never the parent.
 5. **Dependencies** — `workitem_relation(action="create")` for every `blocked_by`, between children only.
 
@@ -82,6 +82,7 @@ Report the created structure to the user, grouped by parent:
 
 - each parent's identifier and title, then under it each child's identifier (e.g. `ABC-1`), title, its `risk:*` Label, and its Module(s). Reason: this is where a wrongly rated level or a child under the wrong delivery is most likely to be noticed. Read the children back with `pql='childOf("<PARENT-ID>")'` rather than listing what you meant to create;
 - **every relation**, listed separately (`ABC-2 blocked_by ABC-1`). Seeing at a glance whether the dependency graph is right is the only human checkpoint in this workflow;
-- any `risk:*` Label that had to be created in the project.
+- every item carrying `needs:decision`, with its open choices. Reason: these are the questions the user has to answer before those items can start, so they should see them now, not when work stalls;
+- any `risk:*` or `needs:decision` Label that had to be created in the project.
 
 Do not casually assert "these can run in parallel" along the way. To compute it, actually run through the `pick-up-work` flow; **do not judge by eye** — items with multiple blockers are exactly where people most easily miss things.

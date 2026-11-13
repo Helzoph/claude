@@ -4,7 +4,7 @@
 # Denies a body that would break read-back: whitespace between block tags,
 # h3 blocks missing / renamed / out of order, or a body sent only as
 # description_stripped. Two templates are accepted: a work item (为什么,
-# 涉及范围, 风险, 完成标准, 验证, then 不做 / 回退 / 注意) and a parent item
+# 涉及范围, 风险, 完成标准, 验证, then 不做 / 回退 / 待定 / 注意) and a parent item
 # (为什么, 交付, then 不做 / 注意). The second h3 picks which one applies. Warns (without blocking) when the title or body looks
 # like it encodes a dependency in prose: a work item identifier or "第 N 步".
 #
@@ -26,7 +26,7 @@ fi
 # open — `|| exit 0` turns a parse error into "no opinion".
 echo "$INPUT" | jq -c '
   def item_required: ["为什么", "涉及范围", "风险", "完成标准", "验证"];
-  def item_optional: ["不做", "回退", "注意"];
+  def item_optional: ["不做", "回退", "待定", "注意"];
   def parent_required: ["为什么", "交付"];
   def parent_optional: ["不做", "注意"];
   def textof: gsub("<[^>]*>"; "") | gsub("&nbsp;"; " ");
