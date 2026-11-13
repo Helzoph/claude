@@ -1,6 +1,6 @@
 ---
 name: write-workitem
-description: "Write or edit the body or title of a single Plane work item: the fixed h3 template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证 / 不做 / 回退 / 注意), numbered completion criteria C1..Cn, numbered verification steps V1..Vn with an agent-run e2e, a risk level, and the item's blocked_by dependencies. Use this skill whenever one work item's description or title is being created or changed — triggers on 'record a bug in Plane', 'add a work item', 'file an issue for this', 'write up this task', 'make this item's criteria more specific', 'add this decision to ABC-3', 'update ABC-3', 'fix the format of ABC-3', 'this item depends on ABC-2', and whenever plan-to-plane or pick-up-work needs to write or patch an item body. Also covers design / spike items whose output is a decision rather than code. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for deciding which Module an item belongs to (use write-module) or for computing what can start next (use pick-up-work)."
+description: "Write or edit the body or title of a single Plane work item: the fixed h3 template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证 / 不做 / 回退 / 注意), numbered completion criteria C1..Cn, numbered verification steps V1..Vn with an agent-run e2e, a risk level, and the item's blocked_by dependencies. Use this skill whenever one work item's description or title is being created or changed — triggers on 'record a bug in Plane', 'add a work item', 'file an issue for this', 'write up this task', 'make this item's criteria more specific', 'add this decision to ABC-3', 'update ABC-3', 'fix the format of ABC-3', 'this item depends on ABC-2', and whenever plan-to-plane or pick-up-work needs to write or patch an item body. Also covers design / spike items whose output is a decision rather than code, and parent items that group the items of one delivery (short template 为什么 / 交付 / 不做 / 注意, set through the `parent` field — 'group these items', 'put ABC-3 under the login delivery'). The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for deciding which Module an item belongs to (use write-module) or for computing what can start next (use pick-up-work)."
 ---
 
 # Write a Plane Work Item Body
@@ -19,6 +19,7 @@ Three facts have structured fields. Writing them as prose is the most common way
 |---|---|---|
 | What must finish first | `blocked_by` relation | `见 ABC-12`, `等 ABC-12 做完`, `依赖 ABC-12`, `ABC-12 已经开了这个口子的话…`, `第二步` / `第 3 步` / `Part 2` in the title |
 | Which functional area | Module | `属于 X 模块`, `[X]` prefixes in the title |
+| Which delivery it is part of | `parent` field (see "Parent Items") | `属于「BUFF 登录」`, `[BUFF 登录]` prefixes in the title; a list of child items in a parent's body |
 | Whether it is done | state | `已完成`, `进行中`, `TODO` |
 
 Reason: `pick-up-work` computes what can start **only** from `blocked_by`. An order written as "第二步" in a title, or as "见 ABC-12" in a body, is invisible to it — the item is offered as ready while the thing it waits on is still open. And a second copy in prose drifts: when the two disagree, nobody knows which is true.
@@ -29,8 +30,9 @@ Reason: `pick-up-work` computes what can start **only** from `blocked_by`. An or
 
 ## Creating a New Item
 
+0. **Pick the parent.** List the open parents: `workitem(action="list", project_id=..., pql='isTopLevel() AND hasChildren() AND stateGroup IN openStates()', fields='id,sequence_id,name')`. If this item belongs to one of those deliveries, pass `parent=<its uuid>` in step 2. If the conversation did not settle it, ask; "no parent" is a valid answer for a one-off fix. If the chosen parent is in the `completed` group, adding a child reopens the delivery — move the parent to a `started`-group state after step 2 and say so in the report. Reason: a parent marked done while it has an open child tells the board the delivery shipped when it did not.
 1. **Pick the Module(s) first** — invoke the `plane-taskgraph:write-module` skill and follow its "Attaching an Item" rules against the places this item will list in `涉及范围`. If no existing Module fits, write-module says to stop and ask: do that **before** creating the item. Reason: an item created without a Module is invisible to anyone reading the board by Module, and `pick-up-work` never offers it.
-2. Write the body per this skill, then `workitem(action="create", labels=[<the one risk:* label id>])` — see "The Risk Label".
+2. Write the body per this skill, then `workitem(action="create", labels=[<the one risk:* label id>], parent=<from step 0, if any>)` — see "The Risk Label".
 3. Attach it to every Module chosen in step 1 (`module(action="manage_workitems")`) and read back, as write-module describes.
 4. **Dependencies.** Ask yourself — and the user, if the conversation did not settle it — which existing items must be finished before this one can start. For each, from **this** (the blocked) item: `workitem_relation(action="create", project_id=..., workitem_id=<this item>, workitem_ids=[<blocker ids>], relation_type="blocked_by")`. Then `workitem_relation(action="list", workitem_id=<this item>)` and confirm every blocker appears under `dependencies.blocked_by`. If nothing blocks it, say so in the report ("无 blocked_by") so the absence is a decision, not an omission.
 5. Run "After Writing" below.
@@ -196,6 +198,41 @@ An item whose output is a decision ("decide how plugins mount their config"), no
 
 The items that implement the decision are separate items with `blocked_by` this one.
 
+## Parent Items
+
+A parent item groups the items of **one delivery** — something the user would call done in one sentence ("BUFF 扫码登录能用了"). It sits between a Module (a long-lived area that never finishes) and an item (one reviewable change): Module answers "where", parent answers "for what", and both are fields, never prose.
+
+A parent is **not work**. Nobody implements, verifies, or commits against it; its children do. So:
+
+- **One level only.** A child never has children of its own. Reason: `pick-up-work` tells a parent from work by `hasChildren()`; a middle layer would be both, and the read-back rules would have to guess.
+- **No Module.** Attach the children, not the parent. Reason: a Module read-back (`module = …`) would list the parent next to real work, and "is Module X done?" would count it.
+- **No `risk:*` Label.** Reason: the Label decides when to pause while doing an item, and a parent is never done as an item. Each child carries its own.
+- **No `blocked_by`, in either direction.** Dependencies go between children, even across parents. Reason: same as Modules — "all of delivery B waits for delivery A" is usually one child waiting for one child, and recording it on the parent holds back children that could start today.
+- **State is copied from the children, never decided on its own.** `pick-up-work` moves the parent to `started` when its first child starts, and to `completed` when its last open child completes. Reason: the parent's state is a second copy of the children's; written by hand it drifts, written by the same rule every time it cannot.
+
+### Parent Template
+
+Two required blocks, two optional, in this order. **No other `h3`**; in particular no `完成标准` / `验证` — done is "every child is closed", and a parent-level check belongs in the most-downstream child (see "Sizing an Item").
+
+| Block | Required | What goes in it |
+|---|---|---|
+| `为什么` | yes | The problem this delivery solves, and the decision it follows from |
+| `交付` | yes | What the user can observe once every child is done, in one or two sentences |
+| `不做` | no | What this delivery deliberately leaves out, each with `原因：` |
+| `注意` | no | Decisions that apply to every child, each with `原因：`; dated as `已定（YYYY-MM-DD）：…` |
+
+```html
+<h3>为什么</h3><p>…</p><h3>交付</h3><p>…</p><h3>不做</h3><ul><li>… 原因：…</li></ul>
+```
+
+- **Never list the children in `交付`.** Reason: the children are the items whose `parent` is this one; a list in prose is a second copy that misses the next child added.
+- The title names the delivery, not a step or a date: `BUFF 扫码登录`, not `第一阶段` or `11 月`.
+- Create it with `workitem(action="create", project_id=..., name=..., description_html=...)` — no `labels`, no `parent`. Then read it back and check the `h3` sequence and the one-line rule (see "After Writing").
+
+### Moving an Item Under a Parent
+
+`workitem(action="update", project_id=..., workitem_id=<child>, parent=<parent uuid>)`. Only the fields passed change, so this touches neither body nor Labels. Read back with `workitem(action="list", project_id=..., pql='childOf("<PARENT-ID>")', fields='id,sequence_id,name')` and confirm the child is listed. Then apply the state rule above to the parent.
+
 ## Sizing an Item
 
 - One item delivers **one observable behaviour**. If 完成标准 needs two unrelated main-flow C items, it is two items.
@@ -223,5 +260,8 @@ Read the item back (`description_html`, `name`, `labels`) and check each of thes
 - Exactly one `risk:*` Label, matching the first word of 风险.
 - **Search the title and body for this project's identifier (`<IDENT>-\d+`) and for `第.{1,3}步`.** Every hit is either removed (it is a dependency → relation; a step number → rename) or restated in this item's own words. Then `workitem_relation(action="list")` shows every blocker the item actually has.
 - For a new item: attached to its Module(s), and step 4's `blocked_by` read back.
+- For a new child: `parent` read back equals the chosen parent's uuid.
 
-Then report the item's identifier, title, risk Label, Module(s), and its `blocked_by` list (or "无 blocked_by") to the user.
+For a **parent**, the checks are instead: the `h3` sequence is exactly 为什么, 交付, then only 不做 / 注意 in that order; no newline between tags and no U+FFFD; no `risk:*` Label; not attached to any Module; no `blocked_by`; the identifier / `第.{1,3}步` search on title and body finds nothing.
+
+Then report the item's identifier, title, risk Label, Module(s), parent (or "无 parent"), and its `blocked_by` list (or "无 blocked_by") to the user. For a parent: identifier, title, and "parent item".

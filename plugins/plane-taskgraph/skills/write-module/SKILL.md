@@ -23,6 +23,8 @@ The test: **after this change is finished, will this Module keep receiving new i
 
 4. `manage_workitems` returns nothing — read back with `module(action="list_workitems", project_id=..., module_id=...)` for each Module and confirm the item is listed.
 
+**Parent items are never attached to a Module** — only their children are (see write-workitem, "Parent Items"). Reason: a Module read-back would list the parent next to real work, and "is Module X done?" would count something nobody works on. A Module and a parent are two separate groupings of the same children: Module by area, parent by delivery.
+
 ## When No Existing Module Fits
 
 **Stop and ask the user** — do not create a Module on your own, and do not create the work item yet. Say which part of the change has no home, and propose a name.

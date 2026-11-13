@@ -1,6 +1,6 @@
 ---
 name: pick-up-work
-description: "Answer or act on any request about work already in Plane — what can start now, doing an item, changing an item's state or marking it done ('把 ABC-12 标完成', 'close ABC-12'), or status questions ('is the X module done?', 'X 模块做完了吗', 'X 的进度') — instead of calling the Plane tools directly. Reads a task graph back from Plane and computes which work items can start right now, by checking whether each item's blocked_by dependencies are all done; then do an item — read its body (current h3 or old strong-heading format), move it to a started state before the first edit, pause for the user according to its risk:* Label, commit with a `Refs: <ITEM-ID>` trailer, post a verification-record comment whose changed-files block is generated from git by a bundled script, and only then mark it done and read the state back. Use this skill when picking up work already recorded in Plane — triggers on 'implement the xxx feature', 'do ABC-12', 'what can I work on next', 'what's unblocked', 'I finished ABC-12', 'ABC-12 做完了', and whenever code was just committed for an item that Plane still shows as not done. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane) or for writing an item body (use write-workitem)."
+description: "Answer or act on any request about work already in Plane — what can start now, doing an item, changing an item's state or marking it done ('把 ABC-12 标完成', 'close ABC-12'), or status questions ('is the X module done?', 'X 模块做完了吗', 'X 的进度', 'is the login delivery done?') — instead of calling the Plane tools directly. Reads a task graph back from Plane and computes which work items can start right now, by checking whether each item's blocked_by dependencies are all done; then do an item — read its body (current h3 or old strong-heading format), move it to a started state before the first edit, pause for the user according to its risk:* Label, commit with a `Refs: <ITEM-ID>` trailer, post a verification-record comment whose changed-files block is generated from git by a bundled script, and only then mark it done and read the state back, keeping the item's parent (its delivery) in step. Use this skill when picking up work already recorded in Plane — triggers on 'implement the xxx feature', 'do ABC-12', 'what can I work on next', 'what's unblocked', 'I finished ABC-12', 'ABC-12 做完了', and whenever code was just committed for an item that Plane still shows as not done. The Plane MCP server ships with this plugin but needs a one-time `claude mcp login plane`. Do NOT use for writing a new plan into Plane (use plan-to-plane) or for writing an item body (use write-workitem)."
 ---
 
 # Read the Task Graph Back From Plane and Compute What Can Start Now
@@ -11,17 +11,30 @@ Definition: the items that are **not done, and whose every `blocked_by` target i
 
 ## Read-Back Flow
 
-### 1. Fetch Unfinished Items (1 Call)
+### 1. Fetch Unfinished Items (2 Calls)
+
+**1a. The open set** — every unfinished item in the project, ids only:
+
+```
+workitem(action="list", project_id=..., pql='stateGroup IN openStates()',
+  fields='id', per_page=100)
+```
+
+Follow `next_cursor` while `next_page_results` is true. Step 4 judges blockers against this set, not against the candidate set below. Reason: a blocker can sit in another Module or another delivery; judged against a candidate set narrowed to one Module, an open blocker elsewhere is simply absent and reads as done, and the item it blocks is offered as ready.
+
+**1b. The candidate set** — the unfinished work in the scope asked about:
 
 ```
 workitem(action="list", project_id=...,
-  pql='module = "<module-uuid>" AND stateGroup IN openStates()',
-  fields='id,sequence_id,name,state_group')
+  pql='module = "<module-uuid>" AND stateGroup IN openStates() AND NOT hasChildren()',
+  fields='id,sequence_id,name,state_group,parent')
 ```
 
-PQL merges "list everything" and "exclude finished" into one call; what comes back is the candidate set.
+PQL merges "list everything", "exclude finished", and "exclude parents" into one call; what comes back is the candidate set. To read one delivery instead of one Module, replace the `module = …` condition with `childOf("<PARENT-ID>")`.
 
-Always pass `fields`. Without trimming, every item carries its full description, thousands of characters; trimmed to these four fields it is a few lines.
+`NOT hasChildren()` is required. A parent item (write-workitem, "Parent Items") has no `blocked_by` of its own, so without the filter it is always computed as ready to start — and it is not work. Parents are normally not attached to Modules, but one attached by hand would still slip in without this condition.
+
+Always pass `fields`. Without trimming, every item carries its full description, thousands of characters; trimmed to these fields it is a few lines.
 
 ### 2. Fetch Dependencies One by One (M Calls, M = Number of Results From the Previous Step)
 
@@ -49,9 +62,11 @@ The response has two buckets:
 
 ### 4. Determine Whether Each Blocker Is Done
 
-Step 1 already filtered out finished items, so: **an id in `blocked_by` that is not in step 1's results → that blocker is done**. No separate lookup of its state is needed.
+Step 1a holds every unfinished item in the project, so: **an id in `blocked_by` that is not in the open set → that blocker is done**. No separate lookup of its state is needed.
 
-⚠️ **Do not trust the state field carried in a `blocked_by` entry**; judge by "is it in the candidate set".
+⚠️ **Do not trust the state field carried in a `blocked_by` entry**; judge by "is it in the open set". And never by "is it in the candidate set" — that set is narrowed to one Module or delivery (see 1a).
+
+A blocker in another project (a cross-project relation) is in neither set. Look it up with `workitem(action="retrieve_by_identifier", workitem_identifier=..., fields="state_group")` — a `retrieve`, not an `update` response, so its `state_group` is current.
 
 ### 5. Derive the Result
 
@@ -76,7 +91,9 @@ The turn that does an item is not finished until step 7 has run or the report sa
 
 ### Read the Body
 
-Step 1 trimmed the description to save tokens, so fetch it once here with `workitem(action="retrieve", fields="description_html,labels,...")`.
+Step 1 trimmed the description to save tokens, so fetch it once here with `workitem(action="retrieve", fields="description_html,labels,parent,...")`.
+
+**If the body's second `h3` is `交付`, this is a parent item, not work** — even when it has no children yet (`hasChildren()` cannot see a parent created a moment ago). Do not do it: list its children (`pql='childOf("<ITEM-ID>")'`) and offer the ones that can start, computed as in steps 1–5.
 
 #### Splitting the Body Into Blocks
 
@@ -133,6 +150,8 @@ workitem(action="update", workitem_id=..., state=<UUID of a state in the started
 ```
 
 First run `state(action="list")` to get the UUID of a state whose group is `started` in that project — and, in the same call, the UUID of a `completed`-group state for "Mark Done", so the last step needs no lookup. For `risk:high`, this is a write — it comes after the first confirmation. For `medium` and `low`, it is the first write, before any file edit.
+
+**Then the parent.** If the item has a `parent` and that parent is in `backlog` or `unstarted`, move the parent to the same `started` state in the same step. Reason: the parent's state is a copy of its children's (write-workitem, "Parent Items"); a delivery whose child is in progress must not read as untouched on the board.
 
 ⚠️ **The `state_group` in `update`'s response is stale** — after changing to Done, the response's `state` and `completed_at` are updated but `state_group` is still the old value. To double-check, `list` again. Trust it and a just-finished item is treated as unfinished, **so the next parallel-set computation comes up short**.
 
@@ -196,6 +215,18 @@ PQL's `id` takes the human identifier (`"ABC-12"`), not the UUID.
 
 The `list` is required: `update`'s response carries a stale `state_group`, so only the `list` result proves the move happened. Quote that `state_group` in the report.
 
+**Then the parent.** If the item has a `parent`, count its children that are still open — after the read-back above, so the item just finished is not counted:
+
+```
+workitem(action="count", project_id=..., pql='childOf("<PARENT-ID>") AND stateGroup IN openStates()')
+```
+
+- `0`, and at least one child is `completed` → move the parent to the same `completed` state and read it back with `list`, exactly as for the item. Quote both read-back states in the report.
+- `0`, but every child is `cancelled` → do not move the parent; ask the user whether the delivery is cancelled. Reason: nothing was delivered, so `completed` would be false, and dropping a whole delivery is the user's call.
+- More than `0` → leave the parent as it is, and say in the report how many children are still open.
+
+`childOf` takes the human identifier (`"ABC-5"`). The item's `parent` field is a uuid; if you do not already have the parent's identifier, `workitem(action="retrieve", workitem_id=<parent uuid>, fields="sequence_id")` gives its number.
+
 If the gate did **not** pass (a failed V, a file outside `涉及范围` without a reason, the user not yet confirming a `high` item), the item stays in `started`. Do not move it back to `backlog` / `unstarted`. Say in the report which gate condition is open. Reason: `started` is the truth — work exists — and the record comment already says what failed.
 
 When the user changes their mind about an item mid-way ("don't do this after all"), ask whether it should go to `cancelled`; do not leave it `started` with nobody working on it.
@@ -208,13 +239,19 @@ There are exactly five groups: `backlog` / `unstarted` / `started` / `completed`
 
 ### "Is Module X Done?"
 
-Answer from the states of the items attached to that Module — nothing else holds this. Run step 1 without the `openStates()` filter, and report the count per state group plus every item not in `completed` / `cancelled`. **Read only; run no tests.** Reason: the question asks for status, and each item's own verification record already says what was verified.
+Answer from the states of the items attached to that Module — nothing else holds this. Run step 1b without the `openStates()` filter, and report the count per state group plus every item not in `completed` / `cancelled`. **Read only; run no tests.** Reason: the question asks for status, and each item's own verification record already says what was verified.
 
 If no Module has that name, say so and list the project's Modules; do not guess from item titles.
 
+### "Is Delivery X Done?"
+
+Same, by parent instead of Module. Find the parent among `pql='isTopLevel() AND hasChildren()'` by title; then `pql='childOf("<PARENT-ID>")'` with no state filter, and report the count per state group plus every child not in `completed` / `cancelled`. Answer from the children, not from the parent's own state — the parent's state is only a copy, and a missed sync would make it lie.
+
+If both a Module and a parent match the name, say which one you answered for. If neither matches, list the open parents and the Modules; do not guess.
+
 ## Report to the User
 
-List the batch that can start in parallel (identifier + title + risk Label), and **what each blocked item is waiting on**. The latter matters just as much — only by seeing "what is being waited on" can the user judge whether to adjust priorities.
+List the batch that can start in parallel (identifier + title + risk Label), grouped under each item's parent title when it has one (one `list` with `pql='hasChildren()'`, `fields='id,sequence_id,name'` maps the `parent` uuids from step 1b to titles), and **what each blocked item is waiting on**. The latter matters just as much — only by seeing "what is being waited on" can the user judge whether to adjust priorities.
 
 After dependencies change (one item finished, or a new dependency added), **recompute** — do not reuse the previous result.
 

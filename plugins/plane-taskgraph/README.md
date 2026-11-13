@@ -24,6 +24,7 @@ sentence:
 | Concept | Where it lives |
 |---|---|
 | Which functional area an item touches | Module (one per long-lived area, e.g. one plugin) |
+| Which delivery an item is part of | `parent` field, pointing at a parent item (one per delivery) |
 | What has to come first | `blocked_by` relation |
 | How risky it is | Exactly one Label: `risk:high` / `risk:medium` / `risk:low` |
 | Whether it's done | State (its `group`, not its name) |
@@ -44,10 +45,10 @@ like a correct one. Computed from the graph (unfinished items whose
 
 | Skill | Triggers on | What it does |
 |---|---|---|
-| [`write-workitem`](skills/write-workitem/SKILL.md) | filing or editing a single item, "rate the risk of ABC-3", "add this decision to ABC-3", "this item depends on ABC-2" | The source of truth for an item body: the `h3` template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证, plus optional 不做 / 回退 / 注意), the `risk:*` Label rules, a variant for design / spike items, dependencies as `blocked_by` relations (never prose), and how e2e checks are written so the agent can run them headless. Format rules and the e2e recipe live in `references/` |
+| [`write-workitem`](skills/write-workitem/SKILL.md) | filing or editing a single item, "rate the risk of ABC-3", "add this decision to ABC-3", "this item depends on ABC-2", "put ABC-3 under the login delivery" | The source of truth for an item body: the `h3` template (为什么 / 涉及范围 / 风险 / 完成标准 / 验证, plus optional 不做 / 回退 / 注意), the `risk:*` Label rules, a variant for design / spike items, the short parent-item template (为什么 / 交付, plus optional 不做 / 注意), dependencies as `blocked_by` relations (never prose), and how e2e checks are written so the agent can run them headless. Format rules and the e2e recipe live in `references/` |
 | [`write-module`](skills/write-module/SKILL.md) | "which module does this go in", "create a module for X" | Maps an item onto existing functional Modules (attaching it to every one it touches); creates a new Module only after you agree, with a plain-text description template |
-| [`plan-to-plane`](skills/plan-to-plane/SKILL.md) | "record this into Plane", "break this into work items" | Orchestrates the two above for a whole design, then **wires the `blocked_by` relations** as a separate mandatory step and lists every relation back to you |
-| [`pick-up-work`](skills/pick-up-work/SKILL.md) | "what can I work on next", "do ABC-12", "is the X module done?" | Computes what can start now; does an item as an eight-step checklist — reads the body, moves it to a started state, pauses according to its risk Label, commits with a `Refs: ABC-12` trailer, posts a verification-record comment, and only then marks it done and reads the state back |
+| [`plan-to-plane`](skills/plan-to-plane/SKILL.md) | "record this into Plane", "break this into work items" | Groups the design into deliveries (one parent item each, shown to you before writing), orchestrates the two above, then **wires the `blocked_by` relations** as a separate mandatory step and lists every relation back to you |
+| [`pick-up-work`](skills/pick-up-work/SKILL.md) | "what can I work on next", "do ABC-12", "is the X module done?" | Computes what can start now (parents excluded, blockers judged against every open item in the project); does an item as an eight-step checklist — reads the body, moves it to a started state, pauses according to its risk Label, commits with a `Refs: ABC-12` trailer, posts a verification-record comment, and only then marks it done and reads the state back — then moves the parent along when its first child starts or its last open child completes |
 
 ### Script
 
@@ -69,7 +70,8 @@ parse, they say nothing and let the call through.
   tool, `create` / `update` only). It **rejects** the call — Claude sees the
   reason and retries — when the body would break read-back: whitespace or a
   newline next to a block tag, `h3` blocks missing, renamed (`涉及范围（摸底）`),
-  invented or out of order, or a body sent only as `description_stripped`. It
+  invented or out of order (a body whose second `h3` is `交付` is checked
+  against the parent template instead), or a body sent only as `description_stripped`. It
   **warns without blocking** when the title or body contains something that
   looks like a work item identifier (`见 ABC-12`) or a numbered step (`第二步`),
   pointing at `blocked_by` instead; identifiers such as `UTF-8` also match, so
@@ -109,6 +111,18 @@ repository — see Installation for the one-time authorisation step.
 keep receiving new items after this batch is done?" A Module created per request
 goes stale, piles up, and stops telling anyone anything. An item that touches
 two areas is attached to both, so neither area's read-back misses it.
+
+**Deliveries are parent items, one level deep.** A Module never finishes, so
+it cannot say "these five items are the login feature". A parent item can: it
+has a body (为什么 / 交付), a state, and comments, which is why it is used
+instead of Plane's Milestone. A parent is not work — no Module, no `risk:*`
+Label, no `blocked_by`, no 完成标准 / 验证 — and `pick-up-work` filters it out
+with `NOT hasChildren()`. Its state is copied from the children by the same
+rule every time (first child started → started; last open child completed →
+completed), and "is delivery X done?" is answered from the children, not from
+that copy. Plain parents rather than Plane's Epic type, because Epics need the
+`epics` and `work_item_types` project features, which a fresh project does not
+have.
 
 **Risk is a Label, and it changes what the agent does.** `risk:high` (hard to
 undo, or reaches outside the repo) stops before any write to discuss the plan
@@ -160,6 +174,11 @@ without it means the step was skipped.
 payments needs the session token, while the refund logic and the reconciliation
 job have nothing to do with login. Recorded at module level, the whole module
 reads as blocked and work that could have started today is held back.
+
+**A blocker is judged against every open item, not the scope asked about.**
+Reading one Module or one delivery narrows the candidate set; an open blocker
+in another Module is then simply absent from it, and "absent" used to read as
+"done". The open set is fetched project-wide (ids only) for that check.
 
 **Reading dependencies is a whitelist, not a blacklist.** Only
 `dependencies.blocked_by` counts as blocking. Custom relation labels are

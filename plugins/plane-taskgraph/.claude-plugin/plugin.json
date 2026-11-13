@@ -1,7 +1,7 @@
 {
   "name": "plane-taskgraph",
-  "version": "0.4.2",
-  "description": "Turn design conversations into a structured task graph in Plane: functional areas become Modules, ordering becomes blocked_by relations, risk becomes a risk:* Label that decides when the agent pauses, and every finished item carries a verification record with git-generated changed files.",
+  "version": "0.5.0",
+  "description": "Turn design conversations into a structured task graph in Plane: functional areas become Modules, deliveries become parent items, ordering becomes blocked_by relations, risk becomes a risk:* Label that decides when the agent pauses, and every finished item carries a verification record with git-generated changed files.",
   "author": {
     "name": "helzoph"
   },
