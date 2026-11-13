@@ -1,5 +1,5 @@
 {
-  "description": "plane-taskgraph guards: reject Plane work item bodies that break the h3 template or the one-line HTML rule, note dependencies written as prose, and remind once at the end of a turn that committed item work without updating the item's state.",
+  "description": "plane-taskgraph guards: reject Plane work item bodies that break the h3 template or the one-line HTML rule, note dependencies written as prose, remind once at the end of a turn that committed item work without updating the item's state, and point a user message about a Plane item or project status at the skill that answers it.",
   "hooks": {
     "PreToolUse": [
       {
@@ -20,6 +20,17 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/remind-state-update.sh\"",
             "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/route-plane-prompt.sh\"",
+            "timeout": 5
           }
         ]
       }

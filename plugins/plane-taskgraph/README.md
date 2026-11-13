@@ -73,7 +73,7 @@ script and explained in `skills/write-workitem/references/e2e-recipe.md`.
 
 ### Hooks
 
-`hooks/hooks.json` registers two guards. Both are plain bash + `jq` and fail
+`hooks/hooks.json` registers three hooks. All are plain bash + `jq` and fail
 open: if `jq` (or, for the Stop hook, `git`) is missing or the input does not
 parse, they say nothing and let the call through.
 
@@ -100,6 +100,17 @@ parse, they say nothing and let the call through.
   Asking git means a command that merely *contains* `git commit … Refs: X-1`
   (a `claude -p` prompt in an e2e run, an `echo`) does not trigger it, and a
   `git commit -F <file>` does.
+- **`route-plane-prompt.sh`** (`UserPromptSubmit`). When the message contains
+  something that looks like a work item identifier (`FMTLAB-12 能开工吗`) or
+  asks what can start (`现在能开工哪些`), it adds one sentence of context naming
+  `pick-up-work`; when it asks how a project stands (`项目现在什么情况`,
+  `有什么要我决定的`), it names `project-status`. It **never blocks and never
+  rewrites** the message — it only adds a note, ending with "if the message is
+  not about Plane, ignore this note". It exists because with many plugins
+  installed Claude Code lists skills by name only, and these questions then get
+  answered by eye. Identifier prefixes that are usually standards (`UTF-8`,
+  `ISO-8601`, `SHA-256`, `RFC-7231`, …) are skipped and the phrase lists are
+  narrow, because a note on every unrelated message is worse than a missed one.
 
 The skills already state these rules. The hooks exist because edits made
 without loading a skill never see them, and the end-of-turn state update is
