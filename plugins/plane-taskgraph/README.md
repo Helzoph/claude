@@ -76,8 +76,11 @@ script and explained in `skills/write-workitem/references/e2e-recipe.md`.
 open: if `jq` (or, for the Stop hook, `git`) is missing or the input does not
 parse, they say nothing and let the call through.
 
-- **`check-workitem-body.sh`** (`PreToolUse` on the plugin's Plane `workitem`
-  tool, `create` / `update` only). It **rejects** the call — Claude sees the
+- **`check-workitem-body.sh`** (`PreToolUse` on every Plane connection's
+  `workitem` tool — matcher `^mcp__.*plane.*__workitem$`, so the plugin's own
+  MCP, a server added by hand such as `plane-remote`, and the claude.ai
+  connector are all covered, while `workitem_comment` / `workitem_relation` are
+  not — `create` / `update` only). It **rejects** the call — Claude sees the
   reason and retries — when the body would break read-back: whitespace or a
   newline next to a block tag, `h3` blocks missing, renamed (`涉及范围（摸底）`),
   invented or out of order (a body whose second `h3` is `交付` is checked

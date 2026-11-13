@@ -1,6 +1,13 @@
 #!/bin/bash
 # PreToolUse guard for the Plane `workitem` tool (create / update).
 #
+# hooks.json matches it as ^mcp__.*plane.*__workitem$, so it covers every
+# Plane connection at once: the plugin's own MCP
+# (mcp__plugin_plane-taskgraph_plane__workitem), a user-added server
+# (mcp__plane-remote__workitem), and the claude.ai connector
+# (mcp__claude_ai_plane__workitem). The anchors keep workitem_comment,
+# workitem_relation and workitem_type out.
+#
 # Denies a body that would break read-back: whitespace between block tags,
 # h3 blocks missing / renamed / out of order, or a body sent only as
 # description_stripped. Two templates are accepted: a work item (为什么,
