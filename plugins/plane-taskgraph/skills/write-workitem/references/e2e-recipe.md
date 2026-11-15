@@ -19,7 +19,7 @@ It then prints four generic assertions and exits non-zero if any fails. In the V
 - **plugin** (fails the run): the `init` event loaded `<plugin>@inline` at the version in plugin.json. Reason: with a marketplace install present, a stale cached copy can be tested instead.
 - **skills** (reported): every `Skill` tool call's `.input.skill`.
 - **tools** (reported): every tool call as `[name, skill-or-action]`.
-- **ending** (fails the run): the `result` event has `is_error` false and `permission_denials` empty; a missing `result` event also fails. Reason: a denied tool makes the agent stop or skip steps in a way that looks identical to correct behaviour.
+- **ending** (fails the run): the `result` event has `is_error` false and `permission_denials` empty; a missing `result` event also fails. Reason: a denied tool makes the agent stop or skip steps in a way that looks identical to correct behaviour. Exception: when the V tests a hook's deny, set `E2E_EXPECT_DENIALS` to the denials the run must produce — comma-separated, each `tool` (any denial of that tool) or `tool:action` (e.g. `mcp__claude_ai_plane__workitem:update`). The match is two-way: a denial no entry matches fails as `unexpected`, and an entry no denial matches fails as `missing` (the hook did not fire). `--check` reads the same variable. A PreToolUse hook's `deny` is recorded in `permission_denials` like any other denial (verified 2026-11-15). The usual fixture passes the hook through `--settings`; when it does, put `enabledPlugins` in that same JSON instead of setting `E2E_DISABLE_PLUGINS`, which adds a second `--settings`.
 
 Three traps the runner handles or exposes through environment variables:
 

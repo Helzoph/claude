@@ -66,7 +66,8 @@ evidence, and a path that is not actually ignored is refused.
 against this repository's copy of the plugin (from the current directory, so
 `cd` into the fixture first) and checks the transcript: the repo copy at the
 manifest's version was loaded, which skills and tools ran, and that the run
-ended with no error and no permission denials. `--check <out.jsonl>` re-checks
+ended with no error and no permission denials (or exactly the denials listed
+in `E2E_EXPECT_DENIALS`, for an e2e that tests a hook's deny). `--check <out.jsonl>` re-checks
 an existing transcript; `--dry-run` prints the command. It refuses to start
 outside a sandbox (`SANDBOX_RUNTIME` is not `1`), because the child agent gets
 unrestricted Bash while reading Plane content; `E2E_UNSANDBOXED_OK=1` overrides

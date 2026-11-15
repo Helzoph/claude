@@ -19,6 +19,10 @@
 #   E2E_ALLOWED_TOOLS    replaces the default --allowedTools list.
 #   E2E_MAX_BUDGET_USD   default 3.   E2E_MAX_TURNS   default 30.
 #   E2E_UNSANDBOXED_OK   1: run even when no sandbox is detected (see below).
+#   E2E_EXPECT_DENIALS   comma-separated denials the run must produce, each
+#                        `tool` (any denial of that tool) or `tool:action`
+#                        (e.g. mcp__claude_ai_plane__workitem:update). For an
+#                        e2e that tests a hook's deny. Also read by --check.
 #
 # Sandbox: the default tool list grants unrestricted Bash to a child agent that
 # reads untrusted Plane content. Inside a Claude Code sandboxed Bash the child
@@ -78,22 +82,36 @@ check() {
     "$f" 2>/dev/null | sed 's/^/  /'
 
   # 4. How it ended. A denied tool makes the agent skip steps in a way that
-  # looks exactly like correct behaviour, so a denial is a failure.
+  # looks exactly like correct behaviour, so a denial is a failure -- unless it
+  # is declared in E2E_EXPECT_DENIALS. The match is two-way: every denial must
+  # match a declared entry (else "unexpected"), and every entry must match a
+  # denial (else "missing": the hook under test did not fire).
   local ending
-  ending=$(jq -c 'select(.type=="result") | [.is_error, ((.permission_denials // []) | length), .num_turns, .total_cost_usd]' \
-    "$f" 2>/dev/null | tail -n 1)
+  ending=$(jq -c --arg e "${E2E_EXPECT_DENIALS:-}" '
+    select(.type=="result")
+    | ($e | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))) as $exp
+    | [(.permission_denials // [])[] | {t: .tool_name, a: (.tool_input.action // null | if . == null then null else tostring end)}] as $d
+    | def hit($x): $x == .t or (.a != null and $x == (.t + ":" + .a));
+      [.is_error, ($d | length), .num_turns, .total_cost_usd,
+       [$d[] | . as $one | select(any($exp[]; . as $x | $one | hit($x)) | not) | [.t, .a]],
+       [$exp[] | . as $x | select(any($d[]; hit($x)) | not)],
+       $exp]' "$f" 2>/dev/null | tail -n 1)
   if [ -z "$ending" ]; then
     echo "FAIL ending: no result event (the run was cut off)"
     fail=1
   else
-    local is_error denials
+    local is_error denials unexpected missing
     is_error=$(jq -r '.[0]' <<<"$ending")
     denials=$(jq -r '.[1]' <<<"$ending")
-    if [ "$is_error" = "false" ] && [ "$denials" = "0" ]; then
-      echo "PASS ending: is_error=false permission_denials=0 (turns, cost: $(jq -c '.[2:]' <<<"$ending"))"
+    unexpected=$(jq -r '.[4] | length' <<<"$ending")
+    missing=$(jq -r '.[5] | length' <<<"$ending")
+    if [ "$is_error" = "false" ] && [ "$unexpected" = "0" ] && [ "$missing" = "0" ]; then
+      echo "PASS ending: is_error=false permission_denials=$denials (turns, cost: $(jq -c '.[2:4]' <<<"$ending"))"
+      [ "$denials" = "0" ] || echo "  expected: $(jq -c '.[6]' <<<"$ending")"
     else
       echo "FAIL ending: is_error=$is_error permission_denials=$denials"
-      jq -c 'select(.type=="result") | .permission_denials[]? | [.tool_name, (.tool_input.action // null)]' "$f" 2>/dev/null | sed 's/^/  denied: /'
+      jq -c '.[4][]' <<<"$ending" | sed 's/^/  unexpected denied: /'
+      jq -r '.[5][]' <<<"$ending" | sed 's/^/  missing expected denial: /'
       fail=1
     fi
   fi
