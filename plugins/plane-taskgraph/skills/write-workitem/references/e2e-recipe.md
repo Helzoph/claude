@@ -27,6 +27,8 @@ Three traps the runner handles or exposes through environment variables:
 - **Another plugin's hook breaks the child session** (e.g. a Stop hook that loops in the sandbox). Pass its id in `E2E_DISABLE_PLUGINS=<plugin>@<marketplace>[,...]`; the runner disables it with `--settings`. Which plugins misbehave depends on the machine, so nothing is disabled by default.
 - **A multi-turn exchange cannot be resumed.** In a sandboxed parent, the child session cannot write its transcript under `~/.claude/projects`, so `--resume <session_id>` finds nothing. Fold the exchange into one prompt instead: state the user's later reply up front ("When you ask for confirmation, treat the answer as 「确认」") and assert on the final state.
 
+The runner refuses to start (exit 2) when no sandbox is detected — `SANDBOX_RUNTIME` is not `1`, i.e. it is not running inside a Claude Code sandboxed Bash. Reason: the default tool list gives the child unrestricted Bash while it reads untrusted Plane content. Run it from the sandboxed Bash; set `E2E_UNSANDBOXED_OK=1` only when the user accepts running unsandboxed. `--dry-run` prints `sandbox: yes|no` without refusing.
+
 Override the tool list with `E2E_ALLOWED_TOOLS` and the bounds with `E2E_MAX_BUDGET_USD` / `E2E_MAX_TURNS`. When the parent session runs Bash in a network sandbox, the run needs `api.anthropic.com` (and `mcp-proxy.anthropic.com` for the claude.ai connectors) allowed.
 
 ## Other Entry Points

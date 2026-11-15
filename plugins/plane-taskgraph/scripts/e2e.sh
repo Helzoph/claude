@@ -18,6 +18,13 @@
 #                        the sandbox).
 #   E2E_ALLOWED_TOOLS    replaces the default --allowedTools list.
 #   E2E_MAX_BUDGET_USD   default 3.   E2E_MAX_TURNS   default 30.
+#   E2E_UNSANDBOXED_OK   1: run even when no sandbox is detected (see below).
+#
+# Sandbox: the default tool list grants unrestricted Bash to a child agent that
+# reads untrusted Plane content. Inside a Claude Code sandboxed Bash the child
+# inherits that sandbox (detected by SANDBOX_RUNTIME=1); in a plain terminal it
+# does not, so the script refuses to start unless E2E_UNSANDBOXED_OK=1. The
+# check guards against running it by accident, not against a forged variable.
 #
 # Rationale: every e2e needs the same flags and the same four assertions, and
 # each one forgotten has cost a run that tested nothing (a skill that never
@@ -133,7 +140,21 @@ case "${E2E_SKILL_BUDGET:-}" in
   *) ENV+=("SLASH_COMMAND_TOOL_CHAR_BUDGET=$E2E_SKILL_BUDGET") ;;
 esac
 
+SANDBOXED=no
+[ "${SANDBOX_RUNTIME:-}" = "1" ] && SANDBOXED=yes
+if [ $SANDBOXED = no ]; then
+  if [ "${E2E_UNSANDBOXED_OK:-}" = "1" ]; then
+    echo "e2e.sh: WARNING no sandbox detected; the child agent gets unrestricted Bash (E2E_UNSANDBOXED_OK=1)" >&2
+  elif [ $DRY_RUN -eq 0 ]; then
+    echo "e2e.sh: refusing to run: no sandbox detected (SANDBOX_RUNTIME is not 1)." >&2
+    echo "  The child agent would get unrestricted Bash while reading untrusted Plane content." >&2
+    echo "  Run it from a Claude Code session's sandboxed Bash, or set E2E_UNSANDBOXED_OK=1 to accept the risk." >&2
+    exit 2
+  fi
+fi
+
 if [ $DRY_RUN -eq 1 ]; then
+  printf 'sandbox: %s\n' "$SANDBOXED"
   printf 'cwd: %s\n' "$PWD"
   printf 'env:'; [ ${#ENV[@]} -gt 0 ] && printf ' %q' "${ENV[@]}"; printf '\n'
   printf 'cmd:'; printf ' %q' "${CMD[@]}"; printf ' > %q\n' "$OUT"
