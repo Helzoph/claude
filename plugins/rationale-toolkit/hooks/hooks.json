@@ -1,5 +1,5 @@
 {
-  "description": "Blocks direct node_modules/.bin/<tool> invocations and redirects to a system-installed command or a package-manager runner (pnpm exec / npx / bunx).",
+  "description": "Blocks direct node_modules/.bin/<tool> invocations and redirects to a system-installed command or a package-manager runner (pnpm exec / npx / bunx), and puts every git push behind user approval while denying force/delete pushes wherever git appears in the command line.",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,11 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/block-node-modules-bin.sh\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-git-push.py\"",
             "timeout": 10
           }
         ]

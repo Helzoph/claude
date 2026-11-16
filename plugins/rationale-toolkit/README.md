@@ -57,6 +57,43 @@ the same command working across package managers.
 The hook fails open: if `jq` is missing it exits without a verdict rather than
 blocking every Bash call. Unlike an output style, hooks also apply to subagents.
 
+| Hook | Event | What it does |
+|---|---|---|
+| [`guard-git-push`](hooks/scripts/guard-git-push.py) | `PreToolUse` (Bash) | Every `git push` asks for approval; force or delete pushes (`--force`, `-f`, `--force-with-lease`, `--mirror`, `--delete`, `-d`, `--prune`, `+ref`, `:ref`) are denied. |
+
+Permission rules match the literal start of a command, so `Bash(git push --force *)`
+does not catch `git -C repo push -f`, `cd x && git push -f`, `env git push -f`, or
+`bash -c "git push +main"`; a broad `Bash(git *)` allow then lets them through.
+The guard tokenizes the whole command line (with `shlex`), finds each `git`
+invocation, skips git's global options (`-C`, `-c`, `--git-dir`, …), and judges the
+subcommand. `send-pack` and `http-push` count as pushes, and so does
+`subtree push`. Abbreviated long options (`--forc`) are denied, and so is mirror
+or `+ref` config set through `-c` or `GIT_CONFIG_*` variables. These get "ask":
+`-c alias.*`, a subcommand held in a variable (`git $c`), a git held in a
+variable (`$g push`), `xargs git`, and writing `remote.*.mirror` /
+`remote.*.push` with `git config`; `-o <value>` is skipped as a push option. ANSI-C quoting (`$'\x67it'`) is decoded first.
+It also re-parses text a shell will run: `sh -c` / `bash -xc` scripts, `eval`,
+backticks, `git submodule foreach`, heredoc bodies fed to a shell, and quoted
+text when a shell reads stdin (`echo '…' | bash`, `bash <<< '…'`). Inline code
+for `python3 -c`, `node -e`, `perl -e` and the like (or a heredoc fed to them)
+has its string literals re-parsed. If that code mentions git and push without
+parsing as a push, it gets "ask". Other quoted text is data, so a quoted commit
+message that mentions "git push" passes. Only an unquoted, uncommented `<<`
+opens a heredoc, and a heredoc with no terminator is read as commands. A line
+where the guard cannot tell which heredocs open (or which delimiter carries the
+`<<-` dash) gets at least "ask".
+
+The guard's reading of bash can differ from bash itself, and a command can be
+shaped to hide a push in that gap. So the guard judges each command three
+times and keeps the strictest verdict: once with full parsing, once without
+ANSI-C decoding, and once with no heredoc parsing at all. The third reading is
+capped at "ask". As a result, a heredoc whose text mentions `git push -f` (a
+commit message passed with `-F -`, for example) gets one confirmation prompt.
+Not seen: aliases or `remote.*.push` set earlier in a git config
+file, and scripts written to a file and run later. It needs `python3`; without it, or on
+input that is not JSON, it gives no verdict. A command it cannot tokenize
+(unbalanced quotes) that mentions git gets "ask".
+
 ## Installation
 
 From within Claude Code:

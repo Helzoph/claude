@@ -4,6 +4,9 @@
     "pr": ""
   },
   "includeGitInstructions": false,
+  "env": {
+    "SECURITY_GUIDANCE_COMMIT_REVIEW": "off"
+  },
   "permissions": {
     "allow": [
       "Bash(pnpm *)",
@@ -38,8 +41,6 @@
       "Bash(make *)",
       "Bash(cmake *)",
       "Bash(gh *)",
-      "Bash(curl *)",
-      "Bash(wget *)",
       "Bash(ls *)",
       "Bash(find *)",
       "Bash(bfs *)",
@@ -84,7 +85,6 @@
       "Bash(uniq *)",
       "Bash(cut *)",
       "Bash(tr *)",
-      "Bash(xargs *)",
       "Bash(tee *)",
       "Bash(diff *)",
       "Bash(comm *)",
@@ -96,8 +96,6 @@
       "Bash(printf *)",
       "Bash(date *)",
       "Bash(seq *)",
-      "Bash(env *)",
-      "Bash(printenv *)",
       "Bash(test *)",
       "Bash(true *)",
       "Bash(false *)",
@@ -127,15 +125,27 @@
       "Bash(docker info *)",
       "Bash(docker compose ps *)",
       "Bash(docker compose logs *)",
-      "Bash(docker compose config *)",
-      "mcp__context7__resolve-library-id",
-      "mcp__context7__query-docs",
-      "mcp__plugin_context7-plugin_context7__resolve-library-id",
-      "mcp__plugin_context7-plugin_context7__query-docs"
+      "Bash(docker compose config --no-env-resolution *)",
+      "mcp__plugin_context7_context7__*"
     ],
     "ask": [
       "Bash(git push *)",
-      "Bash(git push)"
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(yarn *)",
+      "Bash(git stash drop *)",
+      "Bash(git stash clear *)",
+      "Bash(git branch -D *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh repo delete *)",
+      "Bash(gh workflow run *)",
+      "Bash(git -C * push *)",
+      "Bash(git -c * push *)",
+      "Bash(gh release create *)",
+      "Bash(gh release delete *)",
+      "Bash(gh release edit *)",
+      "Bash(gh release upload *)"
     ],
     "deny": [
       "Read(**/.env)",
@@ -157,13 +167,6 @@
       "Bash(curl * | sh *)",
       "Bash(wget * | bash *)",
       "Bash(wget * | sh *)",
-      "Bash(npm install *)",
-      "Bash(npm i *)",
-      "Bash(npm add *)",
-      "Bash(npm ci *)",
-      "Bash(npm run *)",
-      "Bash(npx *)",
-      "Bash(yarn *)",
       "Bash(pip install *)",
       "Bash(pip3 install *)",
       "Bash(brew install *)",
@@ -173,7 +176,22 @@
       "Bash(git push -f *)",
       "Bash(git push --force-with-lease *)",
       "Read(~/.local/share/dev-env/env/**)",
-      "Edit(~/.local/share/dev-env/env/**)"
+      "Edit(~/.local/share/dev-env/env/**)",
+      "Bash(git restore .)",
+      "Bash(git checkout -- .)",
+      "Bash(git clean -fdx *)",
+      "Bash(git clean -xfd *)",
+      "Bash(rm -fr /)",
+      "Bash(rm -fr ~)",
+      "Bash(rm -rf ~/)",
+      "Bash(python -m pip install *)",
+      "Bash(python3 -m pip install *)",
+      "Bash(rm -fr /*)",
+      "Bash(rm -fr ~/*)",
+      "Bash(rm -rf $HOME)",
+      "Bash(rm -rf $HOME/)",
+      "Bash(git clean -xdf *)",
+      "Bash(git clean -dfx *)"
     ]
   },
   "statusLine": {
@@ -187,14 +205,13 @@
     "code-simplifier@claude-plugins-official": true,
     "codex@openai-codex": true,
     "commit-commands@claude-plugins-official": true,
-    "context7-plugin@context7-marketplace": true,
     "context7@claude-plugins-official": true,
-    "data-engineering@claude-plugins-official": true,
+    "data-engineering@claude-plugins-official": false,
     "dev-credentials@helzoph-claude-marketplace": true,
     "dev-env-router@helzoph-claude-marketplace": true,
     "diagram-design@diagram-design": true,
     "env-tiers@helzoph-claude-marketplace": true,
-    "fastly-agent-toolkit@claude-plugins-official": true,
+    "fastly-agent-toolkit@claude-plugins-official": false,
     "feature-dev@claude-plugins-official": true,
     "figma-mcp-rust@figma-mcp-rust": true,
     "frontend-design@claude-plugins-official": true,
@@ -211,9 +228,9 @@
     "sentry@claude-plugins-official": true,
     "session-report@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
-    "swift-lsp@claude-plugins-official": true,
+    "swift-lsp@claude-plugins-official": false,
     "typescript-lsp@claude-plugins-official": true,
-    "windsor-ai@claude-plugins-official": true,
+    "windsor-ai@claude-plugins-official": false,
     "typesafe-jev@helzoph-claude-marketplace": true
   },
   "extraKnownMarketplaces": {
@@ -298,9 +315,8 @@
       "Local macOS development environment, no production access",
       "Package managers: pnpm, bun, uv",
       "Source control: GitHub"
-    ]
+    ],
+    "classifyAllShell": false
   },
-  "voiceEnabled": true,
-  "autoMode.classifyAllShell": false,
   "agentPushNotifEnabled": true
 }

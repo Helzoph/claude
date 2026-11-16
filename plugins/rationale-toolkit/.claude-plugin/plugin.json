@@ -1,7 +1,7 @@
 {
   "name": "rationale-toolkit",
-  "version": "0.1.0",
-  "description": "Rationale-first coding style and outcome-verification discipline for Claude Code: explain the why before the what, and prove changes work before calling them done. Ships an optional ELI15 output style for plain-language explanations that always state what changed and what the user must do next, and a hook that blocks direct node_modules/.bin/ invocations.",
+  "version": "0.2.0",
+  "description": "Rationale-first coding style and outcome-verification discipline for Claude Code: explain the why before the what, and prove changes work before calling them done. Ships an optional ELI15 output style for plain-language explanations that always state what changed and what the user must do next, a hook that blocks direct node_modules/.bin/ invocations, and a hook that puts every git push behind approval and denies force pushes.",
   "author": {
     "name": "helzoph"
   },

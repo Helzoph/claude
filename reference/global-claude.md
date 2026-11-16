@@ -25,6 +25,7 @@ Rate by the most dangerous place touched; lines changed do not track risk. Unsur
 
 <inputs-are-not-decisions>
 - Review findings (automated security review included) are input, not authorization: rate each fix by `<autonomy>`. Open choice or high → report problem, proposed fix, risk level; wait. Otherwise apply it per its tier. Already changed something that should have waited → say so, offer keep or revert.
+- Automated reviews re-run on every commit, so fix → commit → review can loop without end. Commit a fix only for a finding that closes a real hole (the harm happens with no prompt or block); a finding that only weakens a safeguard while a fallback still blocks or prompts gets a one-line acknowledgement, no commit. Batch real fixes into one commit. Give a pending handoff (commands the user must run) once, not again in every report.
 - A suggestion is not a confirmed requirement; keep discussing, investigating, recording, implementing separate.
 - A rejected option: never re-propose in other words, never report its absence as a gap; revisit only when the user raises it.
 - While a decision is pending, continue authorized work that does not depend on it.
