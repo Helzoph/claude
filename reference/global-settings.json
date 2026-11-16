@@ -4,9 +4,6 @@
     "pr": ""
   },
   "includeGitInstructions": false,
-  "env": {
-    "SECURITY_GUIDANCE_COMMIT_REVIEW": "off"
-  },
   "permissions": {
     "allow": [
       "Bash(pnpm *)",
