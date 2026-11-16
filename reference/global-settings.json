@@ -268,14 +268,6 @@
   },
   "spinnerTipsEnabled": false,
   "effortLevel": "auto",
-  "modelSettings": {
-    "claude-opus-5": {
-      "effortLevel": "auto"
-    },
-    "claude-opus-5-5": {
-      "effortLevel": "auto"
-    }
-  },
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
   "tui": "fullscreen",
@@ -315,5 +307,7 @@
     ],
     "classifyAllShell": false
   },
+  "voiceEnabled": true,
+  "autoMode.classifyAllShell": false,
   "agentPushNotifEnabled": true
 }
