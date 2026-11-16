@@ -307,7 +307,5 @@
     ],
     "classifyAllShell": false
   },
-  "voiceEnabled": true,
-  "autoMode.classifyAllShell": false,
   "agentPushNotifEnabled": true
 }
