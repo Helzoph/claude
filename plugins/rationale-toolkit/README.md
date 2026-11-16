@@ -11,6 +11,7 @@ A Claude Code plugin that enforces a rationale-first working style: explain
 |---|---|---|
 | [`rationale-style`](skills/rationale-style/SKILL.md) | Writing, reviewing, or explaining code; design decisions; trade-off analysis | Requires inline `// Rationale: ...` comments on non-trivial logic, and a stated approach/trade-off/risk before implementation. |
 | [`verify-outcomes`](skills/verify-outcomes/SKILL.md) | After completing any code change (bug fix, feature, refactor, config) | Assesses how thoroughly a change needs verification, enforces a failing-test-first bug-fix protocol, an 80% coverage gate, and defines a verification report format. Includes toolchain references for TypeScript, Python, Go, and Rust. |
+| [`design-ui`](skills/design-ui/SKILL.md) | Building, changing, or reviewing a user-facing screen or flow | Starts from the user story (who, situation, goal, needed information, how they learn the result), follows familiar conventions and the project's visual style, keeps implementation terms off screen, and verifies by walking the whole story. |
 
 Skills activate automatically when Claude Code judges the task matches their
 description — no manual invocation needed.

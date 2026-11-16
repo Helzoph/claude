@@ -140,7 +140,7 @@ Before starting a dev server:
 
 #### What to Verify at Runtime
 
-- Navigate the golden path (primary user flow) affected by the change.
+- Navigate the golden path (primary user flow) affected by the change, as the whole user story: including switching away, going back, and reopening, not just the first screen.
 - Check edge cases in UI (empty states, loading states, error states).
 - Open browser devtools — check for console errors, network failures, React/Vue warnings.
 - Verify responsive behavior if layout was changed.

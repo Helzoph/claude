@@ -43,7 +43,6 @@ before it runs plugin-bundled hooks.
 | [`dev-credentials`](plugins/dev-credentials) | A single machine-level file holding budget-capped dev credentials an agent is explicitly allowed to read, so real project secrets never have to be exposed to get a test run working. |
 | [`plane-taskgraph`](plugins/plane-taskgraph) | Turn design conversations into a structured task graph in Plane — functional areas as Modules, deliveries as parent items, ordering as `blocked_by` relations, risk as a `risk:*` Label that decides when the agent pauses — then work through it item by item, each finished item carrying a verification record with git-generated changed files. |
 | [`typesafe-jev`](plugins/typesafe-jev) | Design guidance for building with Jev, TypeSafe's typed-judgment model — task fit, question shape, batching, composition, thresholds, and failure handling, backed by evidence from 38 hack day projects. API fields are always read from TypeSafe's live docs. |
-| [`emil-design-skills`](plugins/emil-design-skills) | Interface design, animation, motion review, and frontend tooling skills by Emil Kowalski. |
 
 `mise-toolchain` and `dev-env-router` share one convention: the baseline `.env`
 lives in `~/.local/share/dev-env/env/`, selected by name (`<repo>.env`, falling
@@ -53,31 +52,18 @@ resolve to the *same* baseline. That rule is documented in full in
 `mise-toolchain`'s `link-env` skill, which is its single source of truth;
 `dev-env-router` carries only the selection command and the safety constraints.
 
-`emil-design-skills` is synchronized from its upstream GitHub repository by a
-scheduled workflow. Updates arrive as reviewable pull requests so the bundled
-skills stay current without silently changing the marketplace.
-
 ## Repository layout
 
 ```
 .
 ├── .claude-plugin/
 │   └── marketplace.json     # Marketplace manifest (this repo's plugin index)
-├── .github/
-│   ├── scripts/
-│   │   └── sync-emil-design-skills.py
-│   └── workflows/
-│       └── sync-emil-design-skills.yml
 ├── plugins/
 │   ├── rationale-toolkit/
 │   │   ├── .claude-plugin/plugin.json  # Claude Code manifest
 │   │   ├── .codex-plugin/plugin.json   # Codex manifest
 │   │   ├── output-styles/eli15.md      # Optional plain-language output style
 │   │   └── hooks/hooks.json            # PreToolUse: node_modules/.bin guard
-│   ├── emil-design-skills/
-│   │   ├── .claude-plugin/plugin.json  # Claude Code manifest
-│   │   ├── .codex-plugin/plugin.json   # Codex manifest
-│   │   └── skills/                     # Imported upstream design skills
 │   ├── mise-toolchain/
 │   │   ├── .claude-plugin/plugin.json  # Claude Code manifest
 │   │   ├── .codex-plugin/plugin.json   # Codex manifest
